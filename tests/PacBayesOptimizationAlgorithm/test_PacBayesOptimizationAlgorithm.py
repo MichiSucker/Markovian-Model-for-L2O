@@ -1,6 +1,6 @@
 import unittest
+from typing import Tuple
 from types import NoneType
-
 from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import ParametricLossFunction
 from classes.OptimizationAlgorithm.derived_classes.derived_classes.subclass_PacBayesOptimizationAlgorithm import (
     PacBayesOptimizationAlgorithm, compute_loss_at_end)
@@ -9,11 +9,31 @@ from typing import Callable
 from classes.LossFunction.class_LossFunction import LossFunction
 from classes.Constraint.class_ProbabilisticConstraint import Constraint, ProbabilisticConstraint
 from algorithms.dummy import Dummy
+from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 from exponential_family.describing_property.reduction_property import instantiate_reduction_property_with
-from experiments.quadratics.training import get_sufficient_statistics
+from exponential_family.sufficient_statistics.sufficient_statistics import evaluate_sufficient_statistics
+# from experiments.quadratics.training import get_sufficient_statistics
 import copy
 import io
 import sys
+
+
+def get_describing_property() -> Tuple[Callable, Callable, Callable]:
+    return instantiate_reduction_property_with(factor=1.0, exponent=0.5)
+
+
+def get_sufficient_statistics(constants: torch.Tensor) -> Callable:
+
+    _, convergence_risk_constraint, _ = get_describing_property()
+
+    def sufficient_statistics(optimization_algorithm, loss_function, probability):
+        return evaluate_sufficient_statistics(optimization_algorithm=optimization_algorithm,
+                                              loss_function=loss_function,
+                                              constants=constants,
+                                              convergence_risk_constraint=convergence_risk_constraint,
+                                              convergence_probability=probability)
+
+    return sufficient_statistics
 
 
 def dummy_function(x, parameter=None):
@@ -37,6 +57,7 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
                                                            initial_state=self.initial_state,
                                                            loss_function=self.loss_function,
                                                            pac_parameters=self.pac_parameters)
+        self.pac_algorithm.set_stopping_criterion(StoppingCriterion(lambda x: False))
 
     def test_creation(self):
         self.assertIsInstance(self.pac_algorithm, PacBayesOptimizationAlgorithm)
