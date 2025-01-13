@@ -30,5 +30,6 @@ class TestLossCriterion(unittest.TestCase):
 
         for t in thresholds:
             self.optimization_algorithm.set_stopping_criterion(LossCriterion(threshold=t))
+            self.assertIsInstance(self.optimization_algorithm.evaluate_stopping_criterion(), bool)
             self.assertEqual((loss_function(self.initial_state[-1]) < t).item(),
                              self.optimization_algorithm.evaluate_stopping_criterion())
