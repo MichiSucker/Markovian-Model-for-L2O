@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from typing import Callable, List
+from typing import Callable, List, Tuple
 from classes.LossFunction.class_LossFunction import LossFunction
 from classes.LossFunction.derived_classes.derived_classes.\
     subclass_NonsmoothParametricLossFunction import NonsmoothParametricLossFunction
@@ -75,10 +75,22 @@ class OptimizationAlgorithm:
         if return_iterate:
             return self.current_iterate
 
-    def compute_partial_trajectory(self, number_of_steps: int) -> List[torch.Tensor]:
-        trajectory = [self.current_state[-1].clone()] + [self.perform_step(return_iterate=True)
-                                                         for _ in range(number_of_steps)]
-        return trajectory
+    def compute_partial_trajectory(self,
+                                   number_of_steps: int
+                                   ) -> Tuple[List[torch.Tensor], List[bool]] | List[torch.Tensor]:
+
+        if self.stopping_criterion is not None:
+            did_converge = [self.evaluate_stopping_criterion()]
+            trajectory = [self.current_state[-1].clone()]
+            for i in range(number_of_steps):
+                trajectory.append(self.perform_step(return_iterate=True))
+                did_converge.append(self.evaluate_stopping_criterion())
+            return trajectory, did_converge
+
+        else:
+            trajectory = [self.current_state[-1].clone()] + [self.perform_step(return_iterate=True)
+                                                             for _ in range(number_of_steps)]
+            return trajectory
 
     def set_loss_function(self, new_loss_function: Callable) -> None:
         self.loss_function = new_loss_function

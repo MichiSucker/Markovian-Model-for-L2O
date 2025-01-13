@@ -148,6 +148,14 @@ class TestClassOptimizationAlgorithm(unittest.TestCase):
         # Check that by computing the trajectory we also count the current state.
         self.assertEqual(len(self.optimization_algorithm.compute_partial_trajectory(number_of_steps=10)), 11)
 
+        # Check that, if we have a constraint, the algorithm also checks for convergence
+        self.optimization_algorithm.set_stopping_criterion(lambda x: True)
+        traj, conv = self.optimization_algorithm.compute_partial_trajectory(number_of_steps=10)
+        self.assertEqual(len(traj), len(conv))
+        for i, c in zip(traj, conv):
+            self.assertIsInstance(i, torch.Tensor)
+            self.assertIsInstance(c, bool)
+
     def test_set_loss_function(self):
         current_loss_function = self.optimization_algorithm.loss_function
         new_loss_function = LossFunction(function=lambda x: torch.linalg.norm(x))
