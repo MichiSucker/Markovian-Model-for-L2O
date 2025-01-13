@@ -148,9 +148,13 @@ class TestClassOptimizationAlgorithm(unittest.TestCase):
         # Check that by computing the trajectory we also count the current state.
         self.assertEqual(len(self.optimization_algorithm.compute_partial_trajectory(number_of_steps=10)), 11)
 
+        # Check that we get an error, if we forgot to specify a stopping criterion, but we want to check for convergence
+        with self.assertRaises(RuntimeError):
+            self.optimization_algorithm.compute_partial_trajectory(number_of_steps=10, check_convergence=True)
+
         # Check that, if we have a constraint, the algorithm also checks for convergence
         self.optimization_algorithm.set_stopping_criterion(lambda x: True)
-        traj, conv = self.optimization_algorithm.compute_partial_trajectory(number_of_steps=10)
+        traj, conv = self.optimization_algorithm.compute_partial_trajectory(number_of_steps=10, check_convergence=True)
         self.assertEqual(len(traj), len(conv))
         for i, c in zip(traj, conv):
             self.assertIsInstance(i, torch.Tensor)

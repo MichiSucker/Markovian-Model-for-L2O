@@ -76,10 +76,15 @@ class OptimizationAlgorithm:
             return self.current_iterate
 
     def compute_partial_trajectory(self,
-                                   number_of_steps: int
+                                   number_of_steps: int,
+                                   check_convergence: bool = False
                                    ) -> Tuple[List[torch.Tensor], List[bool]] | List[torch.Tensor]:
 
-        if self.stopping_criterion is not None:
+        if check_convergence:
+
+            if self.stopping_criterion is None:
+                raise RuntimeError('No StoppingCriterion specified.')
+
             did_converge = [self.evaluate_stopping_criterion()]
             trajectory = [self.current_state[-1].clone()]
             for i in range(number_of_steps):
