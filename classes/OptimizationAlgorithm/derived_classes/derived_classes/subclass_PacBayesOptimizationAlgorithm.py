@@ -1,15 +1,60 @@
-from classes.LossFunction.class_LossFunction import LossFunction
-from classes.LossFunction.derived_classes.derived_classes.\
-    subclass_NonsmoothParametricLossFunction import NonsmoothParametricLossFunction
-from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import ParametricLossFunction
-from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
+from typing import Callable, List, Dict
+from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
+from classes.Constraint.class_Constraint import Constraint
 from classes.OptimizationAlgorithm.derived_classes.subclass_ParametricOptimizationAlgorithm import (
     ParametricOptimizationAlgorithm)
+from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import ParametricLossFunction
+from classes.Constraint.class_Constraint import create_list_of_constraints_from_functions
 import torch
 import torch.nn as nn
 from tqdm import tqdm
-from classes.Constraint.class_Constraint import create_list_of_constraints_from_functions, Constraint
-from typing import List, Callable, Tuple
+
+
+def kl(prior, posterior):
+    return torch.sum(posterior * torch.log(posterior / prior))
+
+
+# To generalize this to \capital_lambda with more than one point, which is avoided here by first estimating a
+# sufficiently good lambda, one needs to add + torch.log(covering_number) in the numerator.
+# Here, it is torch.log(1.0) = 0.
+def get_pac_bound_as_function_of_lambda(posterior_risk, prior, posterior, eps, n, upper_bound) -> Callable:
+    return lambda lamb: (posterior_risk + (kl(posterior, prior) - torch.log(eps)) / lamb
+                         + 0.5 * lamb * upper_bound ** 2 / n)
+
+
+def phi_inv(q, a):
+    return (1 - torch.exp(-a*q)) / (1 - torch.exp(-a))
+
+
+def specify_test_points():
+    # This could be adjusted based on computational constraints. Here, it was just fixed for simplicity.
+    return torch.linspace(start=1e-3, end=1e2, steps=75000)
+
+
+def minimize_upper_bound_in_lambda(pac_bound_function, test_points):
+
+    values_upper_bound = torch.stack([pac_bound_function(lamb) for lamb in test_points])
+    best_upper_bound = torch.min(values_upper_bound)
+    lambda_opt = test_points[torch.argmin(values_upper_bound)]
+
+    if lambda_opt == test_points[0]:
+        print("Note: Optimal lambda found at left boundary!")
+    if lambda_opt == test_points[-1]:
+        print("Note: Optimal lambda found at right boundary!")
+
+    return best_upper_bound, lambda_opt
+
+
+def compute_pac_bound(posterior_risk, prior, posterior, eps, n, upper_bound):
+
+    test_points = specify_test_points()
+    pac_bound_function = get_pac_bound_as_function_of_lambda(posterior_risk=posterior_risk, prior=prior,
+                                                             posterior=posterior, eps=eps, n=n,
+                                                             upper_bound=upper_bound)
+    best_upper_bound, lambda_opt = minimize_upper_bound_in_lambda(pac_bound_function=pac_bound_function,
+                                                                  test_points=test_points)
+
+    return best_upper_bound, lambda_opt
 
 
 class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
@@ -17,106 +62,48 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
     def __init__(self,
                  initial_state: torch.Tensor,
                  implementation: nn.Module,
-                 loss_function: LossFunction | ParametricLossFunction | NonsmoothParametricLossFunction,
-                 pac_parameters: dict,
-                 constraint: Callable = None):
-        super().__init__(initial_state=initial_state,
-                         implementation=implementation,
-                         loss_function=loss_function,
+                 stopping_criterion: StoppingCriterion,
+                 loss_function: ParametricLossFunction,
+                 sufficient_statistics: Callable,
+                 natural_parameters: Callable,
+                 covering_number: torch.Tensor,
+                 epsilon: torch.Tensor,
+                 n_max: int,
+                 constraint: Constraint = None):
+
+        super().__init__(initial_state=initial_state, implementation=implementation, loss_function=loss_function,
                          constraint=constraint)
-        self.sufficient_statistics = pac_parameters['sufficient_statistics']
-        self.natural_parameters = pac_parameters['natural_parameters']
-        self.covering_number = pac_parameters['covering_number']
-        self.epsilon = pac_parameters['epsilon']
-        self.n_max = pac_parameters['n_max']
+        self.set_stopping_criterion(stopping_criterion)
+        self.n_max = n_max
+        self.sufficient_statistics = sufficient_statistics
+        self.natural_parameters = natural_parameters
+        self.covering_number = covering_number
+        self.epsilon = epsilon
         self.pac_bound = None
         self.optimal_lambda = None
 
-    def evaluate_sufficient_statistics_on_all_parameters_and_hyperparameters(
-            self,
-            list_of_loss_functions: List[LossFunction],
-            list_of_hyperparameters: List[dict],
-            estimated_convergence_probabilities: List[torch.Tensor]) -> torch.Tensor:
+    def compute_convergence_time_and_contraction_rate(self):
 
-        values_of_sufficient_statistics = torch.zeros((len(list_of_loss_functions), len(list_of_hyperparameters), 2))
-        pbar = tqdm(enumerate(list_of_hyperparameters), total=len(list_of_hyperparameters))
-        pbar.set_description('Compute Sufficient Statistics')
-        for j, current_hyperparameters in pbar:
+        # Compute loss over iterates and append final loss to list
+        init_loss = self.evaluate_loss_function_at_current_iterate()
+        convergence_time = self.compute_convergence_time(num_steps_max=self.n_max).detach()
+        final_loss = self.evaluate_loss_function_at_current_iterate()
 
-            self.set_hyperparameters_to(current_hyperparameters)
-            for i, current_loss_function in enumerate(list_of_loss_functions):
-                values_of_sufficient_statistics[i, j, :] = self.sufficient_statistics(
-                    self, loss_function=current_loss_function, probability=estimated_convergence_probabilities[j])
+        # Subtract optimal loss (use absolute value, as optimal loss is also approximated; to avoid negative values)
+        init_loss = torch.abs(init_loss - self.loss_function.get_parameter()['opt_val'])
+        final_loss = torch.abs(final_loss - self.loss_function.get_parameter()['opt_val'])
 
-        # Note that we have to take the mean over parameters here, as the Pac-Bound holds for the empirical mean and
-        # one cannot exchange exp and summation.
-        return torch.mean(values_of_sufficient_statistics, dim=0)
+        contraction_factor = (final_loss.detach() / init_loss.detach()) ** (1 / convergence_time)
 
-    def compute_posterior_potentials_and_pac_bound(self,
-                                                   samples_prior: List,
-                                                   potentials_prior: torch.Tensor,
-                                                   estimated_convergence_probabilities: List[torch.Tensor],
-                                                   list_of_loss_functions_train: List[LossFunction]) -> torch.Tensor:
-
-        potentials_posterior = self.get_posterior_potentials_as_function_of_lambda(
-            list_of_loss_functions_train=list_of_loss_functions_train,
-            samples_prior=samples_prior,
-            estimated_convergence_probabilities=estimated_convergence_probabilities,
-            potentials_prior=potentials_prior
-        )
-        upper_bound_as_function_of_lambda = self.get_upper_bound_as_function_of_lambda(potentials=potentials_posterior)
-        best_value, best_lambda = self.minimize_upper_bound_in_lambda(upper_bound_as_function_of_lambda)
-        self.set_variable__optimal_lambda__to(best_lambda)
-        self.set_variable__pac_bound__to(best_value)
-        return potentials_posterior(best_lambda)
-
-    def get_posterior_potentials_as_function_of_lambda(self,
-                                                       list_of_loss_functions_train: List[LossFunction],
-                                                       samples_prior: List[dict],
-                                                       estimated_convergence_probabilities: List[torch.Tensor],
-                                                       potentials_prior: torch.Tensor) -> Callable:
-
-        values_sufficient_statistics = self.evaluate_sufficient_statistics_on_all_parameters_and_hyperparameters(
-            list_of_loss_functions=list_of_loss_functions_train,
-            list_of_hyperparameters=samples_prior,
-            estimated_convergence_probabilities=estimated_convergence_probabilities
-        )
-
-        return lambda x: torch.matmul(values_sufficient_statistics, self.natural_parameters(x)) + potentials_prior
-
-    def get_upper_bound_as_function_of_lambda(self, potentials: Callable) -> Callable:
-        return lambda lamb: -(torch.logsumexp(potentials(lamb), dim=0)
-                              + torch.log(self.epsilon)
-                              - torch.log(self.covering_number)) / (self.natural_parameters(lamb)[0])
-
-    def minimize_upper_bound_in_lambda(self, upper_bound: Callable) -> Tuple[torch.Tensor, torch.Tensor]:
-        capital_lambda = torch.linspace(start=1e-8, end=1e2, steps=int(self.covering_number))
-        values_upper_bound = torch.stack([upper_bound(lamb) for lamb in capital_lambda])
-        best_lambda = capital_lambda[torch.argmin(values_upper_bound)]
-        if best_lambda == capital_lambda[0]:
-            print("Note: Optimal lambda found at left boundary!")
-        if best_lambda == capital_lambda[-1]:
-            print("Note: Optimal lambda found at right boundary!")
-        best_value = torch.min(values_upper_bound)
-        return best_value, best_lambda
-
-    def set_variable__pac_bound__to(self, pac_bound: torch.Tensor) -> None:
-        if self.pac_bound is None:
-            self.pac_bound = pac_bound
-        else:
-            raise Exception("PAC-bound already set.")
-
-    def set_variable__optimal_lambda__to(self, optimal_lambda: torch.Tensor) -> None:
-        if self.optimal_lambda is None:
-            self.optimal_lambda = optimal_lambda
-        else:
-            raise Exception("Optimal lambda already set.")
+        return convergence_time.float(), contraction_factor
 
     def evaluate_convergence_risk(self,
-                                  loss_functions: List[LossFunction],
-                                  constraint_functions: List[Constraint],
-                                  estimated_convergence_probability: torch.Tensor) -> torch.Tensor:
-        losses = []
+                                  loss_functions: List[ParametricLossFunction],
+                                  constraint_functions: List[Constraint]
+                                  ) -> torch.tensor:
+
+        rates, probabilities, stopping_times = [], [], []
+
         for loss_func, constraint_func in zip(loss_functions, constraint_functions):
 
             self.reset_state_and_iteration_counter()
@@ -127,73 +114,168 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
             # as later on, we take the mean, which takes the NUMBER OF LOSSES into account,
             # i.e. the final output would be too large, if one does not include 0.
             if not constraint_func(self):
-                losses.append(torch.tensor(0.0))
+                rates.append(torch.tensor(0.0))  # Take zero, because it involves the indicator function.
+                probabilities.append(torch.tensor(0.))
+                # If the algorithm does not converge, it gets stopped after n_max iterations.
+                stopping_times.append(torch.tensor(self.n_max).float())
                 continue
-            losses.append(compute_loss_at_end(self))
-        return torch.mean(torch.tensor(losses)) / estimated_convergence_probability
 
-    def evaluate_prior_potentials(self,
-                                  loss_functions_prior: List[LossFunction],
-                                  constraint_functions_prior: List[Constraint],
-                                  samples_prior: List[dict],
-                                  estimated_convergence_probabilities: List[torch.Tensor]) -> torch.Tensor:
-        potentials = []
-        pbar = tqdm(zip(samples_prior, estimated_convergence_probabilities), total=len(samples_prior))
+            probabilities.append(torch.tensor(1.))
+            convergence_time, contraction_factor = self.compute_convergence_time_and_contraction_rate()
+            stopping_times.append(convergence_time)
+            rates.append(contraction_factor)
+
+        return (torch.mean(torch.stack(rates)),
+                torch.mean(torch.stack(probabilities)),
+                torch.mean(torch.stack(stopping_times).float()))
+
+    def evaluate_potentials(self,
+                            loss_functions,
+                            constraint_functions,
+                            state_dict_samples):
+
+        potentials, convergence_probabilities, stopping_times = [], [], []
+        pbar = tqdm(state_dict_samples)
         pbar.set_description('Computing prior potentials')
-        for current_hyperparameter, estimated_probability in pbar:
+        for hp in pbar:
 
-            self.set_hyperparameters_to(current_hyperparameter)
-            convergence_risk = self.evaluate_convergence_risk(loss_functions=loss_functions_prior,
-                                                              constraint_functions=constraint_functions_prior,
-                                                              estimated_convergence_probability=estimated_probability)
+            self.set_hyperparameters_to(hp)
+            convergence_risk, convergence_probability, stopping_time = self.evaluate_convergence_risk(
+                loss_functions=loss_functions, constraint_functions=constraint_functions)
             potentials.append(-convergence_risk)
-        return torch.tensor(potentials)
+            convergence_probabilities.append(convergence_probability)
+            stopping_times.append(stopping_time)
 
-    def set_hyperparameters_to_maximum_likelihood(self, state_dict_samples, posterior_potentials):
-        posterior_probabilities = torch.softmax(posterior_potentials, dim=0)
-        alpha_opt = state_dict_samples[torch.argmax(posterior_probabilities)]
-        self.set_hyperparameters_to(alpha_opt)
+        return torch.tensor(potentials), torch.tensor(convergence_probabilities), torch.tensor(stopping_times)
 
-    def pac_bayes_fit(self,
-                      loss_functions_prior: List[LossFunction],
-                      loss_functions_train: List[LossFunction],
-                      fitting_parameters: dict,
-                      sampling_parameters: dict,
-                      constraint_parameters: dict,
-                      update_parameters: dict) -> Tuple[torch.Tensor, List[dict]]:
-
-        self.fit(loss_functions=loss_functions_prior,
-                 fitting_parameters=fitting_parameters,
-                 constraint_parameters=constraint_parameters,
-                 update_parameters=update_parameters)
-
-        _, state_dict_samples_prior, estimated_convergence_probabilities = self.sample_with_sgld(
-            loss_functions=loss_functions_prior,
-            parameters=sampling_parameters)
+    def get_estimates_for_lambdas_and_build_prior(self,
+                                                  loss_functions_prior,
+                                                  state_dict_samples_prior,
+                                                  constraint_parameters):
 
         constraint_functions_prior = create_list_of_constraints_from_functions(
             describing_property=constraint_parameters['describing_property'],
             list_of_functions=loss_functions_prior)
 
-        potentials_prior = self.evaluate_prior_potentials(
-            loss_functions_prior=loss_functions_prior,
-            constraint_functions_prior=constraint_functions_prior,
-            samples_prior=state_dict_samples_prior,
-            estimated_convergence_probabilities=estimated_convergence_probabilities)
-        optimal_posterior_potentials = self.compute_posterior_potentials_and_pac_bound(
-            samples_prior=state_dict_samples_prior,
-            potentials_prior=potentials_prior,
-            estimated_convergence_probabilities=estimated_convergence_probabilities,
-            list_of_loss_functions_train=loss_functions_train,
-            )
+        n_half = int(len(loss_functions_prior) / 2)
+        N_1, N_2 = len(loss_functions_prior[:n_half]), len(loss_functions_prior[n_half:])
+        prior_potentials_1, prior_conv_probs_1, prior_stopping_times_1 = self.evaluate_potentials(
+            loss_functions=loss_functions_prior[:n_half],
+            constraint_functions=constraint_functions_prior[:n_half],
+            state_dict_samples=state_dict_samples_prior)
 
-        self.set_hyperparameters_to_maximum_likelihood(state_dict_samples=state_dict_samples_prior,
-                                                       posterior_potentials=optimal_posterior_potentials)
+        prior_potentials_2, prior_conv_probs_2, prior_stopping_times_2 = self.evaluate_potentials(
+            loss_functions=loss_functions_prior[n_half:],
+            constraint_functions=constraint_functions_prior[n_half:],
+            state_dict_samples=state_dict_samples_prior)
 
-        return self.pac_bound, state_dict_samples_prior
+        prelim_prior = torch.softmax(prior_potentials_1, dim=0)
+        prelim_posterior = torch.softmax(prior_potentials_1 + prior_potentials_2, dim=0)
 
+        # Estimate all three lambdas
+        prelim_rate = torch.sum(prelim_posterior * (-prior_potentials_2))
+        print(f"Prelim Rate = {prelim_rate}")
+        _, lambda_rate = compute_pac_bound(
+            posterior_risk=prelim_rate,
+            prior=prelim_prior, posterior=prelim_posterior,
+            eps=self.epsilon / 3,
+            n=n_half, upper_bound=constraint_parameters['bound'])
 
-def compute_loss_at_end(optimization_algorithm: OptimizationAlgorithm) -> float:
-    _ = [optimization_algorithm.perform_step() for _ in range(optimization_algorithm.n_max)]
-    loss_at_end = optimization_algorithm.evaluate_loss_function_at_current_iterate().item()
-    return loss_at_end
+        print(f"Prelim Lambda Rate = {lambda_rate}")
+
+        posterior_time = torch.sum(prelim_posterior * prior_stopping_times_2)
+        _, lambda_time = compute_pac_bound(
+            posterior_risk=posterior_time, prior=prelim_prior, posterior=prelim_posterior, eps=self.epsilon / 3,
+            n=n_half, upper_bound=self.n_max)
+
+        posterior_prob = torch.sum(prelim_posterior * (1 - prior_conv_probs_2))
+
+        # Note that we use epsilon/3 here, as we want three Pac-bounds holding simultaneously, that is,
+        # we use a union-bound argument with epsilon/3 to get 3 * (epsilon/3) = epsilon. Similarly below.
+        kl_eps = kl(prior=prelim_prior, posterior=prelim_posterior) - torch.log(self.epsilon / 3)
+        lambdas_to_test = torch.linspace(1, 1000, 100000)
+        values = torch.tensor([phi_inv(q=posterior_prob + kl_eps / lamb, a=lamb / n_half)
+                               for lamb in lambdas_to_test])
+        lambda_prob = lambdas_to_test[torch.argmin(values)]
+
+        # Note that, to get the empirical risk here, one cannot just add the prior_potentials, but one has to reweight
+        # them accordingly.
+        prior_potentials = (N_1 * prior_potentials_1 + N_2 * prior_potentials_2) / (N_1 + N_2)
+        prior = torch.softmax(prior_potentials, dim=0)
+
+        return prior, prior_potentials, lambda_rate, lambda_time, lambda_prob
+
+    def build_posterior(self, loss_functions_train, state_dict_samples_prior, prior_potentials, constraint_parameters):
+        constraint_functions_posterior = create_list_of_constraints_from_functions(
+            describing_property=constraint_parameters['describing_property'],
+            list_of_functions=loss_functions_train)
+
+        posterior_potentials, convergence_probabilities, stopping_times = self.evaluate_potentials(
+            loss_functions=loss_functions_train,
+            constraint_functions=constraint_functions_posterior,
+            state_dict_samples=state_dict_samples_prior)
+
+        posterior = torch.softmax(posterior_potentials + prior_potentials, dim=0)
+
+        return posterior, posterior_potentials, stopping_times, convergence_probabilities
+
+    def select_optimal_hyperparameters(self, state_dict_samples_prior, posterior):
+        alpha_opt = state_dict_samples_prior[torch.argmax(posterior)]
+        self.implementation.load_state_dict(alpha_opt)
+
+    def pac_bayes_fit(self,
+                      loss_functions_prior: List[ParametricLossFunction],
+                      loss_functions_train: List[ParametricLossFunction],
+                      fitting_parameters: Dict,
+                      sampling_parameters_prior: Dict,
+                      constraint_parameters: Dict,
+                      update_parameters: Dict
+                      ) -> (torch.tensor, List, List, List, List):
+
+        # Step 1: Find a point inside the constraint set that has a good performance.
+        # For this, perform empirical risk minimization on prior data.
+        self.fit(loss_functions=loss_functions_prior,
+                 fitting_parameters=fitting_parameters,
+                 constraint_parameters=constraint_parameters,
+                 update_parameters=update_parameters)
+
+        # Step 2: Create the support of the prior distribution by:
+        # 2.1: sampling (with the same loss-function) with SGLD in a probabilistically constrained way.
+        _, state_dict_samples_prior, _ = self.sample_with_sgld(
+            loss_functions=loss_functions_prior, parameters=sampling_parameters_prior)
+
+        # 2.2 Estimate good values for each \lambda and build prior
+        prior, prior_potentials, lambda_rate, lambda_time, lambda_prob = self.get_estimates_for_lambdas_and_build_prior(
+            loss_functions_prior=loss_functions_prior, state_dict_samples_prior=state_dict_samples_prior,
+            constraint_parameters=constraint_parameters)
+
+        # 3: Build posterior potentials and evaluate them on the given samples
+        posterior, posterior_potentials, stopping_times, convergence_probabilities = self.build_posterior(
+            loss_functions_train=loss_functions_train, state_dict_samples_prior=state_dict_samples_prior,
+            prior_potentials=prior_potentials, constraint_parameters=constraint_parameters)
+
+        self.select_optimal_hyperparameters(state_dict_samples_prior, posterior)
+
+        # 4: Compute Guarantees
+        # 4.1: PAC-Bound for Rate
+        posterior_rate = torch.sum(posterior * (-posterior_potentials))
+        pac_bound_function_for_rate = get_pac_bound_as_function_of_lambda(
+            posterior_risk=posterior_rate, prior=prior, posterior=posterior, eps=self.epsilon / 3,
+            n=len(loss_functions_train), upper_bound=constraint_parameters['bound'])
+        pac_bound_rate = pac_bound_function_for_rate(lambda_rate)
+
+        # 4.2: PAC-Bound for Probability
+        # 1 - ... because of the UPPER bound, i.e. take the complementary event
+        posterior_prob = torch.sum(posterior * (1 - convergence_probabilities))
+        kl_eps = kl(prior=prior, posterior=posterior) - torch.log(self.epsilon)
+        pac_bound_convergence_probability = phi_inv(q=posterior_prob + kl_eps / lambda_prob,
+                                                    a=lambda_prob / len(loss_functions_train))
+
+        # 4.3: PAC-Bound for Convergence Time
+        posterior_time = torch.sum(posterior * stopping_times)
+        pac_bound_function_for_time = get_pac_bound_as_function_of_lambda(
+            posterior_risk=posterior_time, prior=prior, posterior=posterior, eps=self.epsilon / 3,
+            n=len(loss_functions_train), upper_bound=self.n_max)
+        pac_bound_time = pac_bound_function_for_time(lambda_time)
+
+        return pac_bound_rate, 1 - pac_bound_convergence_probability, pac_bound_time, state_dict_samples_prior
