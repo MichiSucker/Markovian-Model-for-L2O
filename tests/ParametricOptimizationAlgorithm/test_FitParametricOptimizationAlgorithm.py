@@ -11,6 +11,7 @@ from classes.OptimizationAlgorithm.derived_classes.subclass_ParametricOptimizati
 from classes.Helpers.class_ConstraintChecker import ConstraintChecker
 from classes.Helpers.class_TrainingAssistant import TrainingAssistant
 from classes.Helpers.class_TrajectoryRandomizer import TrajectoryRandomizer
+from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 
 
 class TestFitOfParametricOptimizationAlgorithm(unittest.TestCase):
@@ -45,6 +46,7 @@ class TestFitOfParametricOptimizationAlgorithm(unittest.TestCase):
         constraint = Constraint(function=lambda x: True)
         old_hyperparameters = copy.deepcopy(self.optimization_algorithm.implementation.state_dict())
         self.optimization_algorithm.set_constraint(constraint)
+        self.optimization_algorithm.set_stopping_criterion(StoppingCriterion(lambda x: False))
 
         # Check that an output was created.
         capturedOutput = io.StringIO()
@@ -101,6 +103,7 @@ class TestFitOfParametricOptimizationAlgorithm(unittest.TestCase):
         old_hyperparameters = [p.clone() for p in self.optimization_algorithm.implementation.parameters()
                                if p.requires_grad]
         optimizer = torch.optim.Adam(self.optimization_algorithm.implementation.parameters(), lr=1e-4)
+        self.optimization_algorithm.set_stopping_criterion(StoppingCriterion(lambda x: False))
 
         # Perform update and make sure that the hyperparameter do change through that.
         self.optimization_algorithm.update_hyperparameters(optimizer=optimizer,
@@ -179,12 +182,21 @@ class TestFitOfParametricOptimizationAlgorithm(unittest.TestCase):
     def test_compute_ratio_of_losses(self):
         # Initialize setting.
         predicted_iterates = [torch.tensor(1.), torch.tensor(2.), torch.tensor(3.), torch.tensor(4.), torch.tensor(5.)]
+        did_converge = [False] * len(predicted_iterates)
         self.optimization_algorithm.set_loss_function(lambda x: x)
 
         # Check that losses do take the correct ratios here.
-        ratio_of_losses = self.optimization_algorithm.compute_ratio_of_losses(predicted_iterates)
+        ratio_of_losses = self.optimization_algorithm.compute_ratio_of_losses(predicted_iterates, did_converge)
         self.assertTrue(len(ratio_of_losses) == len(predicted_iterates) - 1)
         self.assertEqual(ratio_of_losses, [2./1., 3./2., 4./3., 5./4.])
+
+        # Check that losses are cancelled, when algorithm did converge.
+        # Note that, if the algorithm did converge at iteration n, the ratio at n-1 is zero, because we always need two
+        # values to compute a ratio, that is, the first entry is compute from the first two losses.
+        did_converge[2] = True
+        ratio_of_losses = self.optimization_algorithm.compute_ratio_of_losses(predicted_iterates, did_converge)
+        self.assertTrue(len(ratio_of_losses) == len(predicted_iterates) - 1)
+        self.assertEqual(ratio_of_losses, [2./1., 0.0, 4./3., 5./4.])
 
 
 class TestHelper(unittest.TestCase):

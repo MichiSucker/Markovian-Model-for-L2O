@@ -187,9 +187,10 @@ class ParametricOptimizationAlgorithm(OptimizationAlgorithm):
         optimizer.zero_grad()
         self.determine_next_starting_point(
             trajectory_randomizer=trajectory_randomizer, loss_functions=loss_functions)
-        predicted_iterates = self.compute_partial_trajectory(
-            number_of_steps=trajectory_randomizer.length_partial_trajectory)
-        ratios_of_losses = self.compute_ratio_of_losses(predicted_iterates=predicted_iterates)
+        predicted_iterates, did_algorithm_converge = self.compute_partial_trajectory(
+            number_of_steps=trajectory_randomizer.length_partial_trajectory, check_convergence=True)
+        ratios_of_losses = self.compute_ratio_of_losses(predicted_iterates=predicted_iterates,
+                                                        did_converge=did_algorithm_converge)
         if losses_are_invalid(ratios_of_losses):
             print('Invalid losses.')
             return
@@ -220,9 +221,12 @@ class ParametricOptimizationAlgorithm(OptimizationAlgorithm):
         x_0 = self.current_state.detach().clone()
         self.set_current_state(x_0)
 
-    def compute_ratio_of_losses(self, predicted_iterates: List[torch.Tensor]) -> List[torch.Tensor]:
+    def compute_ratio_of_losses(self, predicted_iterates: List[torch.Tensor],
+                                did_converge: List[bool]) -> List[torch.Tensor]:
+        # It is assumed that the loss-function can only be zero, if the algorithm did converge,
+        # that is, loss_function[k-1] > 0.
         ratios = [self.loss_function(predicted_iterates[k]) / self.loss_function(predicted_iterates[k - 1])
-                  if self.loss_function(predicted_iterates[k - 1]) > 1e-12
+                  if not did_converge[k]
                   else self.loss_function(predicted_iterates[k]) - self.loss_function(predicted_iterates[k])
                   for k in range(1, len(predicted_iterates))]
         return ratios
@@ -350,7 +354,9 @@ class ParametricOptimizationAlgorithm(OptimizationAlgorithm):
         self.set_loss_function(np.random.choice(loss_functions))  # For SGLD, we always sample a new loss-function
         predicted_iterates = self.compute_partial_trajectory(
             number_of_steps=trajectory_randomizer.length_partial_trajectory)
-        ratios_of_losses = self.compute_ratio_of_losses(predicted_iterates=predicted_iterates)
+        did_algorithm_converge = [False] * len(predicted_iterates)  # Did not check for convergence.
+        ratios_of_losses = self.compute_ratio_of_losses(predicted_iterates=predicted_iterates,
+                                                        did_converge=did_algorithm_converge)
         if losses_are_invalid(ratios_of_losses):
             print('Invalid losses.')
             trajectory_randomizer.set_variable__should_restart__to(True)
