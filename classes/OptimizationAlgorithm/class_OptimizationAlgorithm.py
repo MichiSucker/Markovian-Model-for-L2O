@@ -13,7 +13,8 @@ class OptimizationAlgorithm:
                  implementation: nn.Module,
                  initial_state: torch.Tensor,
                  loss_function: LossFunction | ParametricLossFunction | NonsmoothParametricLossFunction,
-                 constraint: Callable = None):
+                 constraint: Callable = None,
+                 stopping_criterion: Callable = None):
         self.implementation = implementation
         self.loss_function = loss_function
         self.initial_state = initial_state.clone()
@@ -21,6 +22,7 @@ class OptimizationAlgorithm:
         self.current_iterate = self.current_state[-1]
         self.iteration_counter = 0
         self.constraint = constraint
+        self.stopping_criterion = stopping_criterion
         self.n_max = None
 
     def get_initial_state(self) -> torch.Tensor:
@@ -62,6 +64,9 @@ class OptimizationAlgorithm:
     def set_constraint(self, function: Callable) -> None:
         self.constraint = function
 
+    def set_stopping_criterion(self, function: Callable) -> None:
+        self.stopping_criterion = function
+
     def perform_step(self, return_iterate=False) -> None | torch.Tensor:
         self.iteration_counter += 1
         self.current_iterate = self.implementation.forward(self)
@@ -87,3 +92,7 @@ class OptimizationAlgorithm:
     def evaluate_constraint(self) -> bool:
         if self.constraint is not None:
             return self.constraint(self)
+
+    def evaluate_stopping_criterion(self) -> bool:
+        if self.stopping_criterion is not None:
+            return self.stopping_criterion(self)

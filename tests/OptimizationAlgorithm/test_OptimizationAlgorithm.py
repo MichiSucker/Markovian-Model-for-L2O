@@ -2,6 +2,7 @@ import unittest
 
 import algorithms.dummy
 from classes.Constraint.class_Constraint import Constraint
+from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
 from classes.LossFunction.class_LossFunction import LossFunction
 from algorithms.dummy import Dummy
@@ -118,6 +119,15 @@ class TestClassOptimizationAlgorithm(unittest.TestCase):
         self.optimization_algorithm.set_constraint(old_constraint)
         self.assertTrue(self.optimization_algorithm.constraint is None)
 
+    def test_set_stopping_criterion(self):
+        old_stopping_criterion = self.optimization_algorithm.stopping_criterion
+        new_stopping_criterion = StoppingCriterion(
+            lambda optimization_algorithm: optimization_algorithm.evaluate_loss_function_at_current_iterate() < 1.)
+        self.optimization_algorithm.set_stopping_criterion(new_stopping_criterion)
+        self.assertFalse(self.optimization_algorithm.stopping_criterion is None)
+        self.optimization_algorithm.set_stopping_criterion(old_stopping_criterion)
+        self.assertTrue(self.optimization_algorithm.stopping_criterion is None)
+
     def test_perform_step(self):
         # Perform one step with the algorithm and make sure that the state and the iteration counter got updated.
         self.assertTrue(hasattr(self.optimization_algorithm.implementation, 'forward'))
@@ -161,3 +171,20 @@ class TestClassOptimizationAlgorithm(unittest.TestCase):
         self.assertIsInstance(self.optimization_algorithm.evaluate_constraint(), bool)
         self.optimization_algorithm.set_current_state(torch.ones(size=self.initial_state.shape))
         self.assertTrue(self.optimization_algorithm.evaluate_constraint())
+
+    def test_evaluate_stopping_criterion(self):
+
+        def dummy_stopping_criterion(optimization_algorithm):
+            return (optimization_algorithm.evaluate_loss_function_at_current_iterate() < 1.).item()
+
+        self.optimization_algorithm.set_stopping_criterion(StoppingCriterion(dummy_stopping_criterion))
+        self.assertEqual(self.optimization_algorithm.evaluate_stopping_criterion(),
+                         dummy_stopping_criterion(self.optimization_algorithm))
+
+        def dummy_stopping_criterion_2(optimization_algorithm):
+            return (optimization_algorithm.evaluate_loss_function_at_current_iterate() > 1.).item()
+
+        self.optimization_algorithm.set_stopping_criterion(StoppingCriterion(dummy_stopping_criterion_2))
+        self.assertEqual(self.optimization_algorithm.evaluate_stopping_criterion(),
+                         dummy_stopping_criterion_2(self.optimization_algorithm))
+
