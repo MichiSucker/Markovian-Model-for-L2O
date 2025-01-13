@@ -81,6 +81,9 @@ class OptimizationAlgorithm:
     def evaluate_loss_function_at_current_iterate(self) -> torch.Tensor:
         return self.loss_function(self.current_iterate)
 
+    def evaluate_gradient_norm_at_current_iterate(self) -> torch.Tensor:
+        return torch.linalg.norm(self.loss_function.compute_gradient(self.current_iterate))
+
     def evaluate_constraint(self) -> bool:
         if self.constraint is not None:
             return self.constraint(self)

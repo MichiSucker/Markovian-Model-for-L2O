@@ -151,6 +151,11 @@ class TestClassOptimizationAlgorithm(unittest.TestCase):
         self.assertEqual(self.loss_function(self.optimization_algorithm.current_iterate),
                          self.optimization_algorithm.evaluate_loss_function_at_current_iterate())
 
+    def test_evaluate_gradient_norm_at_current_iterate(self):
+        self.assertEqual(
+            torch.linalg.norm(self.loss_function.compute_gradient(self.optimization_algorithm.current_iterate)),
+            self.optimization_algorithm.evaluate_gradient_norm_at_current_iterate())
+
     def test_evaluate_constraint(self):
         self.optimization_algorithm.set_constraint(Constraint(dummy_constraint))
         self.assertIsInstance(self.optimization_algorithm.evaluate_constraint(), bool)
