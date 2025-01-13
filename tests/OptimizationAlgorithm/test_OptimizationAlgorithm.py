@@ -1,12 +1,15 @@
 import unittest
 
 import algorithms.dummy
+from algorithms.gradient_descent import GradientDescent
 from classes.Constraint.class_Constraint import Constraint
 from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
 from classes.LossFunction.class_LossFunction import LossFunction
 from algorithms.dummy import Dummy
 import torch
+
+from classes.StoppingCriterion.derived_classes.subclass_LossCriterion import LossCriterion
 
 
 def dummy_function(x):
@@ -159,6 +162,31 @@ class TestClassOptimizationAlgorithm(unittest.TestCase):
         for i, c in zip(traj, conv):
             self.assertIsInstance(i, torch.Tensor)
             self.assertIsInstance(c, bool)
+
+    def test_compute_convergence_time(self):
+        with self.assertRaises(RuntimeError):
+            self.optimization_algorithm.compute_convergence_time(num_steps_max=10)
+
+        self.optimization_algorithm.set_stopping_criterion(LossCriterion(threshold=0.5))
+
+        # Convergence in one step
+        self.optimization_algorithm.implementation = GradientDescent(alpha=torch.tensor(1.0))
+        self.assertEqual(self.optimization_algorithm.compute_convergence_time(num_steps_max=25), 1)
+
+        # Convergence in 0 steps, since already there
+        self.assertEqual(self.optimization_algorithm.compute_convergence_time(num_steps_max=25), 0)
+
+        # Convergence in a few steps
+        self.optimization_algorithm.reset_state_and_iteration_counter()
+        self.optimization_algorithm.implementation = GradientDescent(alpha=torch.tensor(0.5))
+        self.assertTrue(self.optimization_algorithm.compute_convergence_time(num_steps_max=25) > 0)
+        self.assertTrue(self.optimization_algorithm.compute_convergence_time(num_steps_max=25) < 25)
+
+        # No convergence
+        self.optimization_algorithm.reset_state_and_iteration_counter()
+        self.optimization_algorithm.implementation = GradientDescent(alpha=torch.tensor(0.0))
+        self.assertEqual(self.optimization_algorithm.compute_convergence_time(num_steps_max=25), 25)
+        print(self.optimization_algorithm.compute_convergence_time(num_steps_max=25))
 
     def test_set_loss_function(self):
         current_loss_function = self.optimization_algorithm.loss_function

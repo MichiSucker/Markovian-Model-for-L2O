@@ -97,6 +97,25 @@ class OptimizationAlgorithm:
                                                              for _ in range(number_of_steps)]
             return trajectory
 
+    def compute_convergence_time(self, num_steps_max):
+
+        if self.stopping_criterion is None:
+            raise RuntimeError("No StoppingCriterion specified.")
+
+        number_of_steps_until_convergence = 0
+
+        # Check first convergence and then increment, because:
+        # a) if we start at a point that satisfies convergence, we do not want to perform a step and
+        # b) if we did not satisfy the convergence criterion at the last iteration, that is,
+        # num_steps = n_max - 1, we increase it one last time and return num_steps = n_max.
+        for i in range(num_steps_max):
+            if self.evaluate_stopping_criterion():
+                break
+            self.perform_step()
+            number_of_steps_until_convergence += 1
+
+        return number_of_steps_until_convergence
+
     def set_loss_function(self, new_loss_function: Callable) -> None:
         self.loss_function = new_loss_function
 
