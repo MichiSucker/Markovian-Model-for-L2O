@@ -242,7 +242,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
         posterior_time = torch.sum(posterior * potentials_independent_from_prior)
         _, lambda_time = compute_pac_bound(
             posterior_risk=posterior_time, prior=prior, posterior=posterior, eps=self.epsilon / 3,
-            n=size_of_training_data, upper_bound=self.n_max)
+            n=size_of_training_data, upper_bound=torch.tensor(self.n_max))
 
         return lambda_time
 
