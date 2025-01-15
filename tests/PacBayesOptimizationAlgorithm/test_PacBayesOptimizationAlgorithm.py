@@ -1,10 +1,6 @@
 import unittest
 from collections.abc import Callable
 import torch
-from classes.LossFunction.class_LossFunction import LossFunction
-from classes.OptimizationAlgorithm.derived_classes.derived_classes.subclass_PacBayesOptimizationAlgorithm import (
-    kl, get_pac_bound_as_function_of_lambda, phi_inv, specify_test_points, minimize_upper_bound_in_lambda,
-    get_splitting_index, compute_pac_bound, build_final_prior)
 from classes.OptimizationAlgorithm.derived_classes.derived_classes.subclass_PacBayesOptimizationAlgorithm import (
     PacBayesOptimizationAlgorithm)
 from classes.LossFunction.class_LossFunction import LossFunction
@@ -19,8 +15,8 @@ def f(x):
 class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
 
     def setUp(self):
-        self.dim = torch.randint(low=2, high=10, size=(10,)).item()
-        self.initial_state = torch.randn(size=(1, dim))
+        self.dim = torch.randint(low=2, high=10, size=(1,)).item()
+        self.initial_state = torch.randn(size=(1, self.dim))
         self.eps = torch.tensor(0.05)
         self.n_max = 10
         self.stopping_criterion = LossCriterion(threshold=0.5)
@@ -31,5 +27,8 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
                                                        loss_function=self.loss_function,
                                                        implementation=GradientDescent(alpha=torch.tensor(0.1)),
                                                        stopping_criterion=self.stopping_criterion)
+
+    def test_compute_convergence_time_and_contraction_rate(self):
+        pass
 
 
