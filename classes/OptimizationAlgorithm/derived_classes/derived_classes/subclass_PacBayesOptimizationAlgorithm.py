@@ -1,37 +1,44 @@
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Tuple
 from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 from classes.Constraint.class_Constraint import Constraint
 from classes.OptimizationAlgorithm.derived_classes.subclass_ParametricOptimizationAlgorithm import (
     ParametricOptimizationAlgorithm)
-from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import ParametricLossFunction
+from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import LossFunction, ParametricLossFunction
 from classes.Constraint.class_Constraint import create_list_of_constraints_from_functions
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
 
-def kl(prior, posterior):
+def kl(prior: torch.Tensor, posterior: torch.Tensor) -> torch.Tensor:
     return torch.sum(posterior * torch.log(posterior / prior))
 
 
 # To generalize this to \capital_lambda with more than one point, which is avoided here by first estimating a
 # sufficiently good lambda, one needs to add + torch.log(covering_number) in the numerator.
 # Here, it is torch.log(1.0) = 0.
-def get_pac_bound_as_function_of_lambda(posterior_risk, prior, posterior, eps, n, upper_bound) -> Callable:
+def get_pac_bound_as_function_of_lambda(
+        posterior_risk: torch.Tensor,
+        prior: torch.Tensor,
+        posterior: torch.Tensor,
+        eps: torch.Tensor,
+        n: int,
+        upper_bound: torch.Tensor | int) -> Callable:
     return lambda lamb: (posterior_risk + (kl(posterior, prior) - torch.log(eps)) / lamb
                          + 0.5 * lamb * upper_bound ** 2 / n)
 
 
-def phi_inv(q, a):
+def phi_inv(q: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
     return (1 - torch.exp(-a*q)) / (1 - torch.exp(-a))
 
 
-def specify_test_points():
+def specify_test_points() -> torch.Tensor:
     # This could be adjusted based on computational constraints. Here, it was just fixed for simplicity.
     return torch.linspace(start=1e-3, end=1e2, steps=75000)
 
 
-def minimize_upper_bound_in_lambda(pac_bound_function, test_points):
+def minimize_upper_bound_in_lambda(pac_bound_function: Callable[[torch.Tensor], torch.Tensor],
+                                   test_points: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
 
     values_upper_bound = torch.stack([pac_bound_function(lamb) for lamb in test_points])
     best_upper_bound = torch.min(values_upper_bound)
@@ -82,7 +89,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
         self.pac_bound = None
         self.optimal_lambda = None
 
-    def compute_convergence_time_and_contraction_rate(self):
+    def compute_convergence_time_and_contraction_rate(self) -> Tuple[float, torch.Tensor]:
 
         # Compute loss over iterates and append final loss to list
         init_loss = self.evaluate_loss_function_at_current_iterate()
@@ -98,9 +105,9 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
         return convergence_time.float(), contraction_factor
 
     def evaluate_convergence_risk(self,
-                                  loss_functions: List[ParametricLossFunction],
+                                  loss_functions: List[LossFunction],
                                   constraint_functions: List[Constraint]
-                                  ) -> torch.tensor:
+                                  ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         rates, probabilities, stopping_times = [], [], []
 
@@ -130,9 +137,9 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
                 torch.mean(torch.stack(stopping_times).float()))
 
     def evaluate_potentials(self,
-                            loss_functions,
-                            constraint_functions,
-                            state_dict_samples):
+                            loss_functions: List[LossFunction],
+                            constraint_functions: List[Constraint],
+                            state_dict_samples: List[Dict]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
 
         potentials, convergence_probabilities, stopping_times = [], [], []
         pbar = tqdm(state_dict_samples)
@@ -148,10 +155,11 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
 
         return torch.tensor(potentials), torch.tensor(convergence_probabilities), torch.tensor(stopping_times)
 
-    def get_estimates_for_lambdas_and_build_prior(self,
-                                                  loss_functions_prior,
-                                                  state_dict_samples_prior,
-                                                  constraint_parameters):
+    def get_estimates_for_lambdas_and_build_prior(
+            self,
+            loss_functions_prior: List[LossFunction],
+            state_dict_samples_prior: List[Dict],
+            constraint_parameters: Dict) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
 
         constraint_functions_prior = create_list_of_constraints_from_functions(
             describing_property=constraint_parameters['describing_property'],
@@ -205,7 +213,12 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
 
         return prior, prior_potentials, lambda_rate, lambda_time, lambda_prob
 
-    def build_posterior(self, loss_functions_train, state_dict_samples_prior, prior_potentials, constraint_parameters):
+    def build_posterior(self,
+                        loss_functions_train: List[LossFunction],
+                        state_dict_samples_prior: List[Dict],
+                        prior_potentials: torch.Tensor,
+                        constraint_parameters: Dict) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+
         constraint_functions_posterior = create_list_of_constraints_from_functions(
             describing_property=constraint_parameters['describing_property'],
             list_of_functions=loss_functions_train)
@@ -219,18 +232,20 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
 
         return posterior, posterior_potentials, stopping_times, convergence_probabilities
 
-    def select_optimal_hyperparameters(self, state_dict_samples_prior, posterior):
+    def select_optimal_hyperparameters(self,
+                                       state_dict_samples_prior: List[Dict],
+                                       posterior: torch.Tensor) -> None:
         alpha_opt = state_dict_samples_prior[torch.argmax(posterior)]
         self.implementation.load_state_dict(alpha_opt)
 
     def pac_bayes_fit(self,
-                      loss_functions_prior: List[ParametricLossFunction],
-                      loss_functions_train: List[ParametricLossFunction],
+                      loss_functions_prior: List[LossFunction],
+                      loss_functions_train: List[LossFunction],
                       fitting_parameters: Dict,
                       sampling_parameters_prior: Dict,
                       constraint_parameters: Dict,
                       update_parameters: Dict
-                      ) -> (torch.tensor, List, List, List, List):
+                      ) -> (torch.Tensor, List, List, List, List):
 
         # Step 1: Find a point inside the constraint set that has a good performance.
         # For this, perform empirical risk minimization on prior data.
