@@ -11,6 +11,16 @@ from tqdm import tqdm
 
 
 def kl(prior: torch.Tensor, posterior: torch.Tensor) -> torch.Tensor:
+    if len(prior) != len(posterior):
+        raise RuntimeError("Posterior and prior have differing support.")
+
+    if (torch.any(prior < 0)) or (torch.any(posterior < 0)):
+        raise RuntimeError("Distributions are miss-specified.")
+
+    if ((not torch.allclose(torch.sum(prior), torch.tensor(1.0)))
+            or (not torch.allclose(torch.sum(posterior), torch.tensor(1.0)))):
+        raise RuntimeError("Distributions are no probability distributions.")
+
     return torch.sum(posterior * torch.log(posterior / prior))
 
 
@@ -23,7 +33,14 @@ def get_pac_bound_as_function_of_lambda(
         posterior: torch.Tensor,
         eps: torch.Tensor,
         n: int,
-        upper_bound: torch.Tensor | int) -> Callable:
+        upper_bound: torch.Tensor | int) -> Callable[[torch.Tensor], torch.Tensor]:
+
+    if (eps >= 1.0) or (eps < 0):
+        raise RuntimeError("Parameter eps does not lie in [0,1].")
+
+    if posterior_risk > upper_bound:
+        raise RuntimeError("Upper is smaller than risk.")
+
     return lambda lamb: (posterior_risk + (kl(posterior, prior) - torch.log(eps)) / lamb
                          + 0.5 * lamb * upper_bound ** 2 / n)
 
@@ -58,7 +75,24 @@ def get_splitting_index(loss_functions: List[LossFunction]) -> Tuple[int, int, i
     return n_half, N_1, N_2
 
 
-def compute_pac_bound(posterior_risk, prior, posterior, eps, n, upper_bound):
+def compute_pac_bound(posterior_risk: torch.Tensor,
+                      prior: torch.Tensor,
+                      posterior: torch.Tensor,
+                      eps: torch.Tensor,
+                      n: int,
+                      upper_bound: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    if posterior_risk > upper_bound:
+        raise RuntimeError("Upper is smaller than risk.")
+
+    if len(posterior) != len(prior):
+        raise RuntimeError("Distributions do not match in length.")
+
+    if (eps >= 1.0) or (eps < 0):
+        raise RuntimeError("Parameter eps does not lie in [0,1].")
+
+    if n < 1:
+        raise RuntimeError("Parameter n appears to be too small.")
 
     test_points = specify_test_points()
     pac_bound_function = get_pac_bound_as_function_of_lambda(posterior_risk=posterior_risk, prior=prior,
@@ -74,6 +108,13 @@ def build_final_prior(potentials_1: torch.Tensor,
                       potentials_2: torch.Tensor,
                       n_1: int,
                       n_2: int) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    if len(potentials_1) != len(potentials_2):
+        raise RuntimeError("Potentials do not have the same length.")
+
+    if (n_1 <= 0) or (n_2 <= 0):
+        raise RuntimeError("Number of datapoints seems to be wrong.")
+
     # Note that, to get the empirical risk here, one cannot just add the prior_potentials, but one has to reweight
     # them accordingly.
     prior_potentials = (n_1 * potentials_1 + n_2 * potentials_2) / (n_1 + n_2)
