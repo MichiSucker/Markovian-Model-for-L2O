@@ -313,4 +313,36 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
         self.assertIsInstance(pac_bound_prob.item(), float)
 
     def test_pac_bayes_fit(self):
-        pass
+
+        # Most things already have been tested, so we mainly check that the algorithm runs through and produces the
+        # correct type of outputs.
+
+        loss_functions_prior = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+                                for _ in range(10)]
+        loss_functions_train = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+                                for _ in range(10)]
+        rate_property, rate_constraint = get_rate_property(bound=1.0, n_max=self.n_max)
+        constraint_parameters = {'describing_property': rate_property, 'opt_val': torch.tensor(0.0), 'bound': 1.,
+                                 'num_iter_update_constraint': 100}
+        fitting_parameters = {'restart_probability': 0.5, 'length_trajectory': 1, 'n_max': 100,
+                              'num_iter_update_stepsize': 5, 'factor_stepsize_update': 0.5, 'lr': 1e-4}
+        update_parameters = {'with_print': True, 'num_iter_print_update': 10, 'bins': []}
+        sampling_parameters = {'restart_probability': 0.9, 'length_trajectory': 1, 'lr': 1e-6, 'num_samples': 5,
+                               'num_iter_burnin': 5}
+
+        (pac_bound_rate,
+         pac_bound_convergence_probability,
+         pac_bound_time,
+         state_dict_samples) = self.algorithm.pac_bayes_fit(loss_functions_prior=loss_functions_prior,
+                                                            loss_functions_train=loss_functions_train,
+                                                            fitting_parameters=fitting_parameters,
+                                                            sampling_parameters=sampling_parameters,
+                                                            constraint_parameters=constraint_parameters,
+                                                            update_parameters=update_parameters)
+
+        for b in [pac_bound_rate, pac_bound_convergence_probability, pac_bound_time]:
+            self.assertIsInstance(b, torch.Tensor)
+            self.assertIsInstance(b.item(), float)
+            self.assertTrue(b > 0.)
+
+        self.assertTrue(len(state_dict_samples) == sampling_parameters['num_samples'])
