@@ -405,7 +405,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
                       loss_functions_prior: List[ParametricLossFunction],
                       loss_functions_train: List[ParametricLossFunction],
                       fitting_parameters: Dict,
-                      sampling_parameters_prior: Dict,
+                      sampling_parameters: Dict,
                       constraint_parameters: Dict,
                       update_parameters: Dict
                       ) -> (torch.Tensor, List, List, List, List):
@@ -420,7 +420,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
         #   - sampling (with the same loss-function) with SGLD in a probabilistically constrained way
         #   - estimating \lambda
         _, state_dict_samples_prior, _ = self.sample_with_sgld(
-            loss_functions=loss_functions_prior, parameters=sampling_parameters_prior)
+            loss_functions=loss_functions_prior, parameters=sampling_parameters)
         (prior,
          prior_potentials_rate,
          lambda_rate, lambda_time, lambda_prob) = self.get_estimates_for_lambdas_and_build_prior(
