@@ -235,7 +235,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
             posterior_risk=prelim_rate,
             prior=prior, posterior=posterior,
             eps=self.epsilon / 3,
-            n=size_of_training_data, upper_bound=constraint_parameters['bound'])
+            n=size_of_training_data, upper_bound=constraint_parameters['upper_bound'])
 
         return lambda_rate
 
@@ -372,7 +372,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
         posterior_risk_convergence_rate = torch.sum(posterior * (-potentials_that_are_independent_from_prior))
         pac_bound_function_for_rate = get_pac_bound_as_function_of_lambda(
             posterior_risk=posterior_risk_convergence_rate, prior=prior, posterior=posterior, eps=self.epsilon / 3,
-            n=size_of_training_data, upper_bound=constraint_parameters['bound'])
+            n=size_of_training_data, upper_bound=constraint_parameters['upper_bound'])
         pac_bound_rate = pac_bound_function_for_rate(lambda_rate)
         return pac_bound_rate
 
