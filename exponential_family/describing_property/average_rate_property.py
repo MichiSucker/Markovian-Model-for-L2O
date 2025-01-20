@@ -17,7 +17,8 @@ def get_rate_property(bound: float, n_max: int) -> Tuple:
         cur_iteration_count = opt_algo.iteration_counter
         opt_algo.reset_state_and_iteration_counter()
 
-        # Set new loss function and compute corresponding losses
+        # Set new loss function and compute corresponding losses.
+        # Note that 'compute_convergence_time' stops, as soon as the algorithm did converge.
         opt_algo.set_loss_function(f)
         init_loss = opt_algo.evaluate_loss_function_at_current_iterate()
         conv_time = opt_algo.compute_convergence_time(num_steps_max=n_max)
