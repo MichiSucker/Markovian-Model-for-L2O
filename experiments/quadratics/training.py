@@ -11,7 +11,6 @@ from classes.OptimizationAlgorithm.derived_classes.derived_classes.subclass_PacB
 from experiments.quadratics.algorithm import Quadratics
 from exponential_family.describing_property.average_rate_property import get_rate_property
 from algorithms.heavy_ball import HeavyBallWithFriction
-# from exponential_family.sufficient_statistics.sufficient_statistics import evaluate_sufficient_statistics
 from classes.Constraint.class_ProbabilisticConstraint import ProbabilisticConstraint
 from classes.Constraint.class_Constraint import create_list_of_constraints_from_functions, Constraint
 import numpy as np
@@ -117,27 +116,6 @@ def get_stopping_criterion():
     return LossCriterion(threshold=1e-8)
 
 
-# def compute_constants_for_sufficient_statistics(loss_functions_for_training: List[LossFunction],
-#                                                 initial_state: torch.Tensor) -> torch.Tensor:
-#     _, _, empirical_second_moment = get_describing_property()
-#     return empirical_second_moment(list_of_loss_functions=loss_functions_for_training,
-#                                    point=initial_state[-1].flatten()) / len(loss_functions_for_training)
-
-
-# def get_sufficient_statistics(constants: torch.Tensor) -> Callable:
-#
-#     _, convergence_risk_constraint, _ = get_describing_property()
-#
-#     def sufficient_statistics(optimization_algorithm, loss_function, probability):
-#         return evaluate_sufficient_statistics(optimization_algorithm=optimization_algorithm,
-#                                               loss_function=loss_function,
-#                                               constants=constants,
-#                                               convergence_risk_constraint=convergence_risk_constraint,
-#                                               convergence_probability=probability)
-#
-#     return sufficient_statistics
-
-
 def get_algorithm_for_learning(loss_functions: dict,
                                dimension_of_optimization_variable: int) -> PacBayesOptimizationAlgorithm:
 
@@ -170,12 +148,12 @@ def get_baseline_algorithm(loss_function: LossFunction,
     alpha = 4/((torch.sqrt(smoothness_constant) + torch.sqrt(strong_convexity_constant)) ** 2)
     beta = ((torch.sqrt(smoothness_constant) - torch.sqrt(strong_convexity_constant)) /
             (torch.sqrt(smoothness_constant) + torch.sqrt(strong_convexity_constant))) ** 2
-
+    stopping_criterion = get_stopping_criterion()
     std_algo = OptimizationAlgorithm(
         initial_state=initial_state,
         implementation=HeavyBallWithFriction(alpha=alpha, beta=beta),
-        loss_function=loss_function
-    )
+        loss_function=loss_function,
+        stopping_criterion=stopping_criterion)
     return std_algo
 
 
@@ -215,9 +193,12 @@ def set_up_and_train_algorithm(path_of_experiment: str) -> None:
     save_data(savings_path=savings_path, strong_convexity_parameter=mu_min.numpy(), smoothness_parameter=L_max.numpy(),
               pac_bound_rate=pac_bound_rate.numpy(), pac_bound_conv_prob=pac_bound_conv_prob.numpy(),
               pac_bound_time=pac_bound_time.numpy(),
+              upper_bound_rate=get_pac_bayes_parameters()['bound'],
+              upper_bound_time=algorithm_for_learning.n_max,
               initialization=algorithm_for_learning.initial_state.clone().numpy(),
               number_of_iterations=algorithm_for_learning.n_max, parameters=parameters,
-              samples_prior=state_dict_samples_prior, best_sample=algorithm_for_learning.implementation.state_dict())
+              samples_prior=state_dict_samples_prior,
+              best_sample=algorithm_for_learning.implementation.state_dict())
 
 
 def save_data(savings_path: str,
@@ -226,6 +207,8 @@ def save_data(savings_path: str,
               pac_bound_rate: NDArray,
               pac_bound_conv_prob: NDArray,
               pac_bound_time: NDArray,
+              upper_bound_rate: float,
+              upper_bound_time: int,
               initialization: NDArray,
               number_of_iterations: int,
               parameters: dict,
@@ -237,6 +220,8 @@ def save_data(savings_path: str,
     np.save(savings_path + 'pac_bound_rate', pac_bound_rate)
     np.save(savings_path + 'pac_bound_conv_prob', pac_bound_conv_prob)
     np.save(savings_path + 'pac_bound_time', pac_bound_time)
+    np.save(savings_path + 'upper_bound_rate', upper_bound_rate)
+    np.save(savings_path + 'upper_bound_time', upper_bound_time)
     np.save(savings_path + 'initialization', initialization)
     np.save(savings_path + 'number_of_iterations', number_of_iterations)
     with open(savings_path + 'parameters_problem', 'wb') as file:
