@@ -24,8 +24,8 @@ def get_rate_property(bound: float, n_max: int) -> Tuple:
         final_loss = opt_algo.evaluate_loss_function_at_current_iterate()
 
         # Subtract optimal loss
-        init_loss = torch.abs(init_loss - opt_algo.loss_function.get_parameter()['opt_val'])
-        final_loss = torch.abs(final_loss - opt_algo.loss_function.get_parameter()['opt_val'])
+        init_loss = torch.abs(init_loss - opt_algo.loss_function.get_parameter()['optimal_loss'])
+        final_loss = torch.abs(final_loss - opt_algo.loss_function.get_parameter()['optimal_loss'])
 
         # Reset current state, loss function, etc.
         opt_algo.set_current_state(cur_state)

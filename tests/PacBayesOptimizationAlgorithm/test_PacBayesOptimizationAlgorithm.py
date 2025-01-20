@@ -22,7 +22,7 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
         self.eps = torch.tensor(0.05)
         self.n_max = 10
         self.stopping_criterion = LossCriterion(threshold=0.5)
-        self.loss_function = ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        self.loss_function = ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
         self.algorithm = PacBayesOptimizationAlgorithm(initial_state=self.initial_state,
                                                        epsilon=self.eps,
                                                        n_max=self.n_max,
@@ -49,11 +49,11 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
 
         # Check for the case that the optimal value was not specified
         with self.assertRaises(RuntimeError):
-            del self.algorithm.loss_function.get_parameter()['opt_val']
+            del self.algorithm.loss_function.get_parameter()['optimal_loss']
             self.algorithm.compute_convergence_time_and_contraction_rate()
 
     def test_evaluate_convergence_risk(self):
-        loss_functions = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                           for _ in range(10)]
         constraint_functions = [Constraint(function=lambda x: True) for _ in range(10)]
 
@@ -84,7 +84,7 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
 
     def test_evaluate_potentials(self):
 
-        loss_functions = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                           for _ in range(10)]
         state_dict_samples = [copy.deepcopy(self.algorithm.implementation.state_dict()) for _ in range(3)]
         constraint_functions = [Constraint(function=lambda x: True) for _ in range(10)]
@@ -138,7 +138,7 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
 
     @unittest.skip("Too expensive.")
     def test_get_preliminary_prior_distribution(self):
-        loss_functions = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                           for _ in range(10)]
         state_dict_samples = [copy.deepcopy(self.algorithm.implementation.state_dict()) for _ in range(3)]
         constraint_functions = [Constraint(function=lambda x: True) for _ in range(10)]
@@ -167,7 +167,7 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
 
         # Basically the same test as above.
 
-        loss_functions = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                           for _ in range(10)]
         state_dict_samples = [copy.deepcopy(self.algorithm.implementation.state_dict()) for _ in range(3)]
         constraint_functions = [Constraint(function=lambda x: True) for _ in range(10)]
@@ -195,12 +195,12 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
 
     @unittest.skip("Too expensive.")
     def test_get_estimates_for_lambdas_and_build_prior(self):
-        loss_functions = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                           for _ in range(10)]
         state_dict_samples = [copy.deepcopy(self.algorithm.implementation.state_dict()) for _ in range(3)]
 
         rate_property, rate_constraint = get_rate_property(bound=1.0, n_max=self.n_max)
-        constraint_parameters = {'describing_property': rate_property, 'opt_val': torch.tensor(0.0), 'bound': 1.}
+        constraint_parameters = {'describing_property': rate_property, 'optimal_loss': torch.tensor(0.0), 'bound': 1.}
 
         (final_prior,
          final_prior_potentials,
@@ -228,12 +228,12 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
     @unittest.skip("Too expensive.")
     def test_build_posterior(self):
 
-        loss_functions = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                           for _ in range(10)]
         state_dict_samples = [copy.deepcopy(self.algorithm.implementation.state_dict()) for _ in range(3)]
         prior_rates = -torch.abs(torch.randn((len(state_dict_samples,))))
         rate_property, rate_constraint = get_rate_property(bound=1.0, n_max=self.n_max)
-        constraint_parameters = {'describing_property': rate_property, 'opt_val': torch.tensor(0.0), 'bound': 1.}
+        constraint_parameters = {'describing_property': rate_property, 'optimal_loss': torch.tensor(0.0), 'bound': 1.}
 
         (posterior,
          posterior_potentials,
@@ -277,7 +277,7 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
         potentials = -torch.distributions.uniform.Uniform(0.0, 1.0).sample((len(state_dict_samples), ))
         lambda_rate = torch.tensor(2.5)
         rate_property, rate_constraint = get_rate_property(bound=1.0, n_max=self.n_max)
-        constraint_parameters = {'describing_property': rate_property, 'opt_val': torch.tensor(0.0), 'bound': 1.}
+        constraint_parameters = {'describing_property': rate_property, 'optimal_loss': torch.tensor(0.0), 'bound': 1.}
         pac_bound_rate = self.algorithm.compute_pac_bound_for_convergence_rate(
             prior=prior, posterior=posterior, potentials_that_are_independent_from_prior=potentials,
             lambda_rate=lambda_rate, size_of_training_data=10, constraint_parameters=constraint_parameters)
@@ -317,12 +317,12 @@ class TestPacBayesOptimizationAlgorithm(unittest.TestCase):
         # Most things already have been tested, so we mainly check that the algorithm runs through and produces the
         # correct type of outputs.
 
-        loss_functions_prior = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions_prior = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                                 for _ in range(10)]
-        loss_functions_train = [ParametricLossFunction(function=f, parameter={'opt_val': torch.tensor(0.0)})
+        loss_functions_train = [ParametricLossFunction(function=f, parameter={'optimal_loss': torch.tensor(0.0)})
                                 for _ in range(10)]
         rate_property, rate_constraint = get_rate_property(bound=1.0, n_max=self.n_max)
-        constraint_parameters = {'describing_property': rate_property, 'opt_val': torch.tensor(0.0), 'bound': 1.,
+        constraint_parameters = {'describing_property': rate_property, 'optimal_loss': torch.tensor(0.0), 'bound': 1.,
                                  'num_iter_update_constraint': 100}
         fitting_parameters = {'restart_probability': 0.5, 'length_trajectory': 1, 'n_max': 100,
                               'num_iter_update_stepsize': 5, 'factor_stepsize_update': 0.5, 'lr': 1e-4}

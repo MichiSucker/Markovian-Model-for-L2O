@@ -149,7 +149,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
 
     def compute_convergence_time_and_contraction_rate(self) -> Tuple[torch.Tensor, torch.Tensor]:
 
-        if self.loss_function.get_parameter().get('opt_val') is None:
+        if self.loss_function.get_parameter().get('optimal_loss') is None:
             raise RuntimeError("Optimal value not given.")
 
         # Compute loss over iterates and append final loss to list
@@ -161,8 +161,8 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
             return torch.tensor(0.0), torch.tensor(0.0)
 
         # Subtract optimal loss (use absolute value, as optimal loss is also approximated; to avoid negative values)
-        init_loss = torch.abs(init_loss - self.loss_function.get_parameter()['opt_val'])
-        final_loss = torch.abs(final_loss - self.loss_function.get_parameter()['opt_val'])
+        init_loss = torch.abs(init_loss - self.loss_function.get_parameter()['optimal_loss'])
+        final_loss = torch.abs(final_loss - self.loss_function.get_parameter()['optimal_loss'])
 
         contraction_factor = (final_loss.detach() / init_loss.detach()) ** (1 / convergence_time)
 
