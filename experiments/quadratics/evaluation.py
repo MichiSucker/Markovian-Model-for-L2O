@@ -11,7 +11,8 @@ from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import
 from experiments.quadratics.algorithm import Quadratics
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
 from experiments.quadratics.data_generation import get_loss_function_of_algorithm
-from experiments.quadratics.training import get_describing_property, get_baseline_algorithm, get_stopping_criterion
+from experiments.quadratics.training import get_describing_property, get_baseline_algorithm, get_stopping_criterion, \
+    get_pac_bayes_parameters
 
 
 class EvaluationAssistant:
@@ -80,7 +81,9 @@ def save_data(savings_path: str,
               rates_of_baseline_algorithm: NDArray,
               times_of_baseline_algorithm: NDArray,
               ground_truth_losses: List,
-              percentage_constrained_satisfied: float) -> None:
+              percentage_constrained_satisfied: float,
+              upper_bound_rate: float,
+              upper_bound_time: int) -> None:
 
     np.save(savings_path + 'losses_of_baseline_algorithm', np.array(losses_of_baseline_algorithm))
     np.save(savings_path + 'rates_of_baseline_algorithm', np.array(rates_of_baseline_algorithm))
@@ -92,6 +95,9 @@ def save_data(savings_path: str,
 
     np.save(savings_path + 'ground_truth_losses', np.array(ground_truth_losses))
     np.save(savings_path + 'empirical_probability', percentage_constrained_satisfied)
+
+    np.save(savings_path + 'upper_bound_rate', upper_bound_rate)
+    np.save(savings_path + 'upper_bound_time', upper_bound_time)
 
 
 def set_up_evaluation_assistant(loading_path: str) -> EvaluationAssistant:
@@ -240,4 +246,6 @@ def evaluate_algorithm(loading_path: str, path_of_experiment: str) -> None:
               rates_of_baseline_algorithm=rates_of_baseline_algorithm,
               times_of_baseline_algorithm=times_of_baseline_algorithm,
               ground_truth_losses=[0. for _ in range(len(evaluation_assistant.test_set))],
-              percentage_constrained_satisfied=percentage_constrained_satisfied)
+              percentage_constrained_satisfied=percentage_constrained_satisfied,
+              upper_bound_rate=get_pac_bayes_parameters()['upper_bound'],
+              upper_bound_time=evaluation_assistant.number_of_iterations_during_training)
