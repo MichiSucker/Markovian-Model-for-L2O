@@ -369,9 +369,10 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
                                                lambda_rate: torch.Tensor,
                                                size_of_training_data: int,
                                                constraint_parameters: Dict) -> torch.Tensor:
+        # If you need to bound for all three parameters simultaneously, change self.epsilon to self.epsilon/3
         posterior_risk_convergence_rate = torch.sum(posterior * (-potentials_that_are_independent_from_prior))
         pac_bound_function_for_rate = get_pac_bound_as_function_of_lambda(
-            posterior_risk=posterior_risk_convergence_rate, prior=prior, posterior=posterior, eps=self.epsilon / 3,
+            posterior_risk=posterior_risk_convergence_rate, prior=prior, posterior=posterior, eps=self.epsilon,
             n=size_of_training_data, upper_bound=constraint_parameters['upper_bound'])
         pac_bound_rate = pac_bound_function_for_rate(lambda_rate)
         return pac_bound_rate
@@ -382,9 +383,10 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
                                                potentials_that_are_independent_from_prior: torch.Tensor,
                                                lambda_time: torch.Tensor,
                                                size_of_training_data: int):
+        # If you need to bound for all three parameters simultaneously, change self.epsilon to self.epsilon/3
         posterior_risk_convergence_time = torch.sum(posterior * potentials_that_are_independent_from_prior)
         pac_bound_function_for_time = get_pac_bound_as_function_of_lambda(
-            posterior_risk=posterior_risk_convergence_time, prior=prior, posterior=posterior, eps=self.epsilon / 3,
+            posterior_risk=posterior_risk_convergence_time, prior=prior, posterior=posterior, eps=self.epsilon,
             n=size_of_training_data, upper_bound=self.n_max)
         pac_bound_time = pac_bound_function_for_time(lambda_time)
         return pac_bound_time
@@ -395,6 +397,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
                                                       potentials_that_are_independent_from_prior: torch.Tensor,
                                                       lambda_prob: torch.Tensor,
                                                       size_of_training_data: int):
+        # If you need to bound for all three parameters simultaneously, change self.epsilon to self.epsilon/3
         posterior_risk_convergence_probability = torch.sum(posterior * (1 - potentials_that_are_independent_from_prior))
         kl_eps = kl(prior=prior, posterior=posterior) - torch.log(self.epsilon)
         pac_bound_convergence_probability = phi_inv(q=posterior_risk_convergence_probability + kl_eps / lambda_prob,
