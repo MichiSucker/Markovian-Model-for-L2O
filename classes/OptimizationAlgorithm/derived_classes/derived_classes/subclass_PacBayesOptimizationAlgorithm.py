@@ -1,4 +1,6 @@
 from typing import Callable, List, Dict, Tuple
+
+from classes.StoppingCriterion.class_CombinedCriterion import CombinedCriterion
 from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 from classes.Constraint.class_Constraint import Constraint
 from classes.OptimizationAlgorithm.derived_classes.subclass_ParametricOptimizationAlgorithm import (
@@ -127,7 +129,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
     def __init__(self,
                  initial_state: torch.Tensor,
                  implementation: nn.Module,
-                 stopping_criterion: StoppingCriterion,
+                 stopping_criterion: StoppingCriterion | CombinedCriterion,
                  loss_function: ParametricLossFunction,
                  # sufficient_statistics: Callable,
                  # natural_parameters: Callable,
