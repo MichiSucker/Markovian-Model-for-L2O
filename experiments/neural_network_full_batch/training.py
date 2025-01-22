@@ -176,7 +176,7 @@ def set_up_and_train_algorithm(path_of_experiment: str) -> None:
 
     algorithm_for_learning = get_algorithm_for_learning(
         loss_functions=loss_functions,
-        dimension_of_optimization_variable=neural_network_for_std_training.get_dimension())
+        dimension_of_optimization_variable=neural_network_for_std_training.get_dimension_of_weights())
     algorithm_for_initialization = get_algorithm_for_initialization(
         initial_state_for_std_algorithm=algorithm_for_learning.initial_state[-1].reshape((1, -1)),
         loss_function=loss_functions['prior'][0]

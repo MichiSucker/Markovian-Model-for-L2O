@@ -39,7 +39,7 @@ class TestNeuralNetwork(unittest.TestCase):
         # the neural network.
         degree = 5
         nn_std = NeuralNetworkForStandardTraining(degree=degree)
-        dim = nn_std.get_dimension_of_hyperparameters()
+        dim = nn_std.get_dimension_of_weights()
         self.assertIsInstance(dim, int)
         self.assertEqual(dim, sum([torch.prod(torch.tensor(p.shape)).item() for p in nn_std.parameters()]))
 
@@ -58,7 +58,7 @@ class TestNeuralNetwork(unittest.TestCase):
         # Check that we can flatten the weights of the neural network into a big tensor.
         degree = 5
         nn_std = NeuralNetworkForStandardTraining(degree=degree)
-        dim = nn_std.get_dimension_of_hyperparameters()
+        dim = nn_std.get_dimension_of_weights()
         all_parameters = nn_std.transform_parameters_to_tensor()
         self.assertIsInstance(all_parameters, torch.Tensor)
         self.assertEqual(len(all_parameters), dim)
@@ -96,6 +96,6 @@ class TestNeuralNetwork(unittest.TestCase):
         self.assertIsInstance(losses, list)
         self.assertIsInstance(iterates, list)
         self.assertTrue(losses[0] > losses[-1])
-        dim = nn_std.get_dimension_of_hyperparameters()
+        dim = nn_std.get_dimension_of_weights()
         for it in iterates:
             self.assertEqual(dim, len(it))

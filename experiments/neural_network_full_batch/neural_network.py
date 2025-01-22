@@ -20,7 +20,7 @@ class NeuralNetworkForStandardTraining(nn.Module):
     def get_shape_parameters(self) -> List:
         return [p.size() for p in self.parameters() if p.requires_grad]
 
-    def get_dimension_of_hyperparameters(self) -> int:
+    def get_dimension_of_weights(self) -> int:
         return sum([torch.prod(torch.tensor(s)).item() for s in self.get_shape_parameters()])
 
     def load_parameters_from_tensor(self, tensor: torch.Tensor) -> None:
