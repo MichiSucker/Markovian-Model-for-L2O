@@ -215,6 +215,8 @@ class TestTraining(unittest.TestCase):
                   pac_bound_rate=np.empty(1),
                   pac_bound_time=np.empty(1),
                   pac_bound_conv_prob=np.empty(1),
+                  upper_bound_rate=0.0,
+                  upper_bound_time=0,
                   initialization=np.empty(1),
                   number_of_iterations=0,
                   parameters={},
