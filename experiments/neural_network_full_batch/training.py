@@ -2,7 +2,9 @@ import torch
 from typing import List, Callable, Tuple
 from pathlib import Path
 from classes.LossFunction.class_LossFunction import LossFunction
+from classes.StoppingCriterion.class_CombinedCriterion import CombinedCriterion
 from classes.StoppingCriterion.derived_classes.subclass_LossCriterion import LossCriterion
+from classes.StoppingCriterion.derived_classes.subclass_GradientCriterion import GradientCriterion
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
 from algorithms.gradient_descent import GradientDescent
 from experiments.neural_network_full_batch.data_generation import get_data, get_powers_of_polynomials
@@ -43,7 +45,9 @@ def create_parametric_loss_functions_from_parameters(template_loss_function: Cal
 
 
 def get_initial_state(dim: int) -> torch.Tensor:
-    return torch.zeros((2, dim))
+    # Note that it is important to keep the same initial point: Here, the algorithm only gets on a single starting
+    # point, so it depends on this concrete initialization.
+    return torch.randn(2 * dim).reshape((2, -1))
 
 
 def get_parameters_of_estimation() -> dict:
@@ -101,8 +105,8 @@ def get_constraint_parameters(number_of_training_iterations: int) -> dict:
 
 def get_pac_bayes_parameters() -> dict:
     return {'epsilon': torch.tensor(0.05),
-            # TODO: Rename n_max to maximal_number_of_iterations
             'upper_bound': 1.0,
+            # TODO: Rename n_max to maximal_number_of_iterations
             'n_max': 200}
 
 
@@ -116,7 +120,7 @@ def get_constraint(parameters_of_estimation: dict, loss_functions_for_constraint
 
 
 def get_stopping_criterion():
-    return LossCriterion(threshold=0.75)
+    return CombinedCriterion([LossCriterion(threshold=0.75), GradientCriterion(threshold=0.75)])
 
 
 def get_algorithm_for_learning(loss_functions: dict,
@@ -172,7 +176,7 @@ def set_up_and_train_algorithm(path_of_experiment: str) -> None:
 
     algorithm_for_learning = get_algorithm_for_learning(
         loss_functions=loss_functions,
-        dimension_of_optimization_variable=neural_network_for_std_training.get_dimension_of_hyperparameters())
+        dimension_of_optimization_variable=neural_network_for_std_training.get_dimension())
     algorithm_for_initialization = get_algorithm_for_initialization(
         initial_state_for_std_algorithm=algorithm_for_learning.initial_state[-1].reshape((1, -1)),
         loss_function=loss_functions['prior'][0]
