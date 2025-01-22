@@ -193,7 +193,7 @@ def set_up_and_train_algorithm(path_of_experiment: str) -> None:
     save_data(savings_path=savings_path, strong_convexity_parameter=mu_min.numpy(), smoothness_parameter=L_max.numpy(),
               pac_bound_rate=pac_bound_rate.numpy(), pac_bound_conv_prob=pac_bound_conv_prob.numpy(),
               pac_bound_time=pac_bound_time.numpy(),
-              upper_bound_rate=get_pac_bayes_parameters()['bound'],
+              upper_bound_rate=get_pac_bayes_parameters()['upper_bound'],
               upper_bound_time=algorithm_for_learning.n_max,
               initialization=algorithm_for_learning.initial_state.clone().numpy(),
               number_of_iterations=algorithm_for_learning.n_max, parameters=parameters,
