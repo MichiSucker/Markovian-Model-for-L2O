@@ -141,6 +141,7 @@ def compute_losses(evaluation_assistant: EvaluationAssistant,
 
             number_of_times_constrained_satisfied += 1
             losses_of_learned_algorithm.append(loss_over_iterations)
+            stopping_times_learned_algorithm.append(stopping_time)
             rate = compute_rate(loss_at_beginning=loss_over_iterations[0],
                                 loss_at_end=loss_over_iterations[stopping_time],
                                 stopping_time=stopping_time)
@@ -176,7 +177,7 @@ def set_up_evaluation_assistant(loading_path: str) -> Tuple[EvaluationAssistant,
         optimal_hyperparameters=best_sample, implementation_class=NnOptimizer)
     evaluation_assistant.loss_of_neural_network = loss_of_neural_network
     evaluation_assistant.implementation_arguments = (
-        {'dim': neural_network_for_standard_training.get_dimension_of_hyperparameters()})
+        {'dim': neural_network_for_standard_training.get_dimension_of_weights()})
     evaluation_assistant.lr_adam = 0.008  # Originally, this was found by gridsearch.
     return evaluation_assistant, neural_network_for_standard_training
 
