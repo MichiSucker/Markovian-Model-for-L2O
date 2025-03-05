@@ -20,6 +20,7 @@ class TrainingAssistant:
         self.factor_update_stepsize = factor_update_stepsize
         self.running_loss = 0
         self.loss_histogram = []
+        self.ratios = []
         if bins is None:
             self.bins = [1e0, 1e-4, 1e-8, 1e-12, 1e-16, 1e-20, 1e-24, 1e-28][::-1]
         else:
@@ -66,10 +67,12 @@ class TrainingAssistant:
         print(f"\nIteration: {iteration}; Found point inside constraint: "
               f"{constraint_checker.found_point_inside_constraint}")
         vals, bins = np.histogram(self.loss_histogram, bins=self.bins)
+        print(f"\tAvg. Ratio = {np.mean(self.ratios):.2f}")
         print(f"\tLosses:")
         for j in range(len(vals) - 1, -1, -1):
             print(f"\t\t[{bins[j + 1]:.0e}, {bins[j]:.0e}] : {vals[j]}/{self.print_update_every}")
 
     def reset_running_loss_and_loss_histogram(self) -> None:
         self.loss_histogram = []
+        self.ratios = []
         self.running_loss = 0

@@ -200,6 +200,7 @@ class ParametricOptimizationAlgorithm(OptimizationAlgorithm):
 
         with torch.no_grad():
             training_assistant.loss_histogram.append(self.loss_function(predicted_iterates[-1]).item())
+            training_assistant.ratios.extend([t.item() for t in ratios_of_losses])
             training_assistant.running_loss += sum_losses.item()
 
     def determine_next_starting_point(self,
