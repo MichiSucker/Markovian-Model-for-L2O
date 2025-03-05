@@ -4,6 +4,11 @@ from torch.nn import functional
 import torchvision.transforms as transforms
 import numpy as np
 from experiments.image_processing.get_matrix import make_filter2d, make_derivatives2d
+from classes.StoppingCriterion.derived_classes.subclass_GradientCriterion import GradientCriterion
+from classes.LossFunction.derived_classes.subclass_ParametricLossFunction import ParametricLossFunction
+from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
+from algorithms.nesterov_accelerated_gradient_descent import NesterovAcceleratedGradient
+from tqdm import tqdm
 from PIL import Image
 from os import listdir
 from random import shuffle
@@ -48,7 +53,8 @@ def get_finite_difference_kernels() -> Tuple[torch.Tensor, torch.Tensor]:
 
 
 def get_shape_of_images() -> Tuple[int, int, int, int]:
-    img_height = 250
+    # TODO: Adjust dimension accordingly
+    img_height = 50
     img_width = int(0.75 * img_height)
     return 1, 1, img_height, img_width  # Note that this automatically returns a tuple
 
@@ -71,9 +77,10 @@ def get_largest_possible_regularization_parameter() -> float:
     return dist.high.item()
 
 
-def get_loss_function_of_algorithm(blurring_kernel: torch.Tensor) -> Tuple[Callable, Callable]:
+def get_loss_function_of_algorithm(blurring_kernel: torch.Tensor) -> Tuple[Callable, Callable, Callable, Callable]:
 
     shape_of_image = get_shape_of_images()
+    epsilon = get_epsilon()
     diff_kernel_width, diff_kernel_height = get_finite_difference_kernels()
 
     def blur_tensor(x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
@@ -87,7 +94,6 @@ def get_loss_function_of_algorithm(blurring_kernel: torch.Tensor) -> Tuple[Calla
         return 0.5 * torch.linalg.norm(cur_blurred_img - blurred_img) ** 2
 
     def regularizer(x: torch.Tensor, mu: torch.Tensor) -> torch.Tensor:
-        epsilon = get_epsilon()
         d_h, d_w = img_derivatives(x=x.reshape(shape_of_image))
         return mu * torch.sum(torch.sqrt(d_h ** 2 + d_w ** 2 + epsilon ** 2))
 
@@ -96,7 +102,13 @@ def get_loss_function_of_algorithm(blurring_kernel: torch.Tensor) -> Tuple[Calla
     def loss_function(x, parameter):
         return quadratic(x, blurred_img=parameter['img']) + regularizer(x, mu=parameter['mu'])
 
-    return loss_function, blur_tensor
+    def data_fidelity(x, parameter):
+        return quadratic(x, blurred_img=parameter['img'])
+
+    def regularization(x, parameter):
+        return regularizer(x, mu=parameter['mu'])
+
+    return loss_function, data_fidelity, regularization, blur_tensor
 
 
 def get_smoothness_parameter() -> float:
@@ -197,16 +209,46 @@ def get_parameters(images: List[torch.Tensor],
     return parameters
 
 
+def approximate_optimal_loss(parameters: dict, template_loss_function: Callable, smoothness_parameter: float):
+
+    stop_crit = GradientCriterion(threshold=1e-5)
+    height, width = get_image_height_and_width()
+    initialization = torch.vstack((torch.zeros(width * height),
+                                   torch.zeros(width * height),
+                                   torch.zeros(width * height)))
+    step_size = torch.tensor(1 / smoothness_parameter)
+    std_algo = OptimizationAlgorithm(
+        initial_state=initialization,
+        implementation=NesterovAcceleratedGradient(alpha=step_size),
+        stopping_criterion=stop_crit,
+        loss_function=...)
+
+    for dataset in parameters.keys():
+        pbar = tqdm(parameters[dataset])
+        for parameter in pbar:
+
+            std_algo.reset_state_and_iteration_counter()
+            cur_loss_function = ParametricLossFunction(function=template_loss_function, parameter=parameter)
+            std_algo.set_loss_function(cur_loss_function)
+            std_algo.compute_convergence_time(num_steps_max=5000)
+            opt_loss = std_algo.evaluate_loss_function_at_current_iterate()
+            parameter['optimal_loss'] = torch.tensor(opt_loss.item())
+
+    return parameters
+
+
 def get_data(path_to_images: str,
              number_of_datapoints_per_dataset: dict,
-             device: str) -> Tuple[dict, Callable, float]:
+             device: str) -> Tuple[dict, Callable, Callable, Callable, float]:
 
     blurring_kernel = get_blurring_kernel()
     smoothness_parameter = get_smoothness_parameter()
-    loss_function_of_algorithm, blur_tensor = get_loss_function_of_algorithm(blurring_kernel)
+    loss_function_of_algorithm, quadratic, regularizer, blur_tensor = get_loss_function_of_algorithm(blurring_kernel)
     images = load_images(path_to_images, device=device)
     parameters = get_parameters(
         images=images, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset, blurring_function=blur_tensor
     )
+    parameters = approximate_optimal_loss(parameters=parameters, template_loss_function=loss_function_of_algorithm,
+                                          smoothness_parameter=smoothness_parameter)
 
-    return parameters, loss_function_of_algorithm, smoothness_parameter
+    return parameters, loss_function_of_algorithm, quadratic, regularizer, smoothness_parameter
