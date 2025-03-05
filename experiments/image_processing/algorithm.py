@@ -57,16 +57,16 @@ class ConvNet(nn.Module):
         # Compute loss
         loss = opt_algo.loss_function(opt_algo.current_state[1]).reshape((1,))
         old_loss = opt_algo.loss_function(opt_algo.current_state[0]).reshape((1,))
-        data_fidelity_loss = opt_algo.loss_function.functional_part(opt_algo.current_state[1]).reshape((1,))
-        old_data_fidelity_loss = opt_algo.loss_function.functional_part(opt_algo.current_state[0]).reshape((1,))
+        data_fidelity_loss = opt_algo.loss_function.data_fidelity(opt_algo.current_state[1]).reshape((1,))
+        old_data_fidelity_loss = opt_algo.loss_function.data_fidelity(opt_algo.current_state[0]).reshape((1,))
         regularization_loss = opt_algo.loss_function.regularizer(opt_algo.current_state[1]).reshape((1,))
         old_regularization_loss = opt_algo.loss_function.regularizer(opt_algo.current_state[0]).reshape((1,))
 
         # Compute and normalize gradient(s).
-        data_fidelity_gradient = opt_algo.loss_function.func_grad(opt_algo.current_state[1])
+        data_fidelity_gradient = opt_algo.loss_function.compute_gradient_of_data_fidelity(opt_algo.current_state[1])
         data_fidelity_gradient_norm = torch.linalg.norm(data_fidelity_gradient).reshape((1,))
 
-        regularization_gradient = opt_algo.loss_function.reg_grad(opt_algo.current_state[1])
+        regularization_gradient = opt_algo.loss_function.compute_gradient_of_regularizer(opt_algo.current_state[1])
         regularization_gradient_norm = torch.linalg.norm(regularization_gradient).reshape((1,))
         gradient = data_fidelity_gradient + regularization_gradient
         gradient_norm = torch.linalg.norm(gradient).reshape((1,))
