@@ -10,28 +10,32 @@ class NnOptimizer(nn.Module):
 
         self.extrapolation = nn.Parameter(0.001 * torch.ones(dim))
         self.gradient = nn.Parameter(0.001 * torch.ones(dim))
-        input_size, hidden_size, output_size = 6, 16, 1
-        self.compute_update_step = nn.Sequential(
-            nn.Conv2d(input_size, hidden_size, kernel_size=1),
+        in_channels = 6
+        hidden_channels = 16
+        out_channels = 1
+        self.compute_update_direction = nn.Sequential(
+            nn.Conv2d(in_channels, hidden_channels, kernel_size=1),
             nn.ReLU(),
-            nn.Conv2d(hidden_size, hidden_size, kernel_size=1),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=1),
             nn.ReLU(),
-            nn.Conv2d(hidden_size, hidden_size, kernel_size=1),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=1),
             nn.ReLU(),
-            nn.Conv2d(hidden_size, hidden_size, kernel_size=1),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=1),
             nn.ReLU(),
-            nn.Conv2d(hidden_size, hidden_size, kernel_size=1),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=1),
             nn.ReLU(),
-            nn.Conv2d(hidden_size, output_size, kernel_size=1),
+            nn.Conv2d(hidden_channels, out_channels, kernel_size=1),
         )
 
-        input_size, hidden_size, output_size = 5, 8, 4
-        self.compute_weighting_coefficients = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
+        in_features = 5
+        hidden_features = 8
+        out_features = 4
+        self.compute_weights = nn.Sequential(
+            nn.Linear(in_features, hidden_features),
             nn.ReLU(),
-            nn.Linear(hidden_size, hidden_size),
+            nn.Linear(hidden_features, hidden_features),
             nn.ReLU(),
-            nn.Linear(hidden_size, output_size),
+            nn.Linear(hidden_features, out_features),
         )
 
         # For stability
@@ -39,37 +43,37 @@ class NnOptimizer(nn.Module):
 
     def forward(self, algorithm: OptimizationAlgorithm) -> torch.Tensor:
 
-        # Compute and normalize gradient
-        grad = algorithm.loss_function.compute_gradient(algorithm.current_state[1])
-        grad_norm = torch.linalg.norm(grad).reshape((1,))
-        if grad_norm > self.eps:
-            grad = grad / grad_norm
+        # Normalize gradient
+        gradient = algorithm.loss_function.compute_gradient(algorithm.current_state[1])
+        gradient_norm = torch.linalg.norm(gradient).reshape((1,))
+        if gradient_norm > self.eps:
+            gradient = gradient / gradient_norm
 
-        # Compute and normalize momentum
-        diff = algorithm.current_state[1] - algorithm.current_state[0]
-        diff_norm = torch.linalg.norm(diff).reshape((1,))
-        if diff_norm > self.eps:
-            diff = diff / diff_norm
+        # Compute new hidden state
+        difference = algorithm.current_state[1] - algorithm.current_state[0]
+        difference_norm = torch.linalg.norm(difference).reshape((1,))
+        if difference_norm > self.eps:
+            difference = difference / difference_norm
 
-        coefficients = self.compute_weighting_coefficients(
+        weight_vector = self.compute_weights(
             torch.concat(
-                (torch.log(1 + grad_norm.reshape((1,))),
-                 torch.log(1 + diff_norm.reshape((1,))),
-                 torch.dot(grad, diff).reshape((1,)),
+                (torch.log(1 + gradient_norm.reshape((1,))),
+                 torch.log(1 + difference_norm.reshape((1,))),
+                 torch.dot(gradient, difference).reshape((1,)),
                  torch.log(algorithm.loss_function(algorithm.current_state[1]).detach().reshape((1,))),
                  torch.log(algorithm.loss_function(algorithm.current_state[0]).detach().reshape((1,)))))
         )
-        update = self.compute_update_step(
+        update_step = self.compute_update_direction(
             torch.concat((
-                coefficients[0] * self.gradient * grad.reshape((1, 1, 1, -1)),
-                coefficients[1] * self.extrapolation * diff.reshape((1, 1, 1, -1)),
-                coefficients[2] * grad.reshape((1, 1, 1, -1)),
-                coefficients[3] * diff.reshape((1, 1, 1, -1)),
+                weight_vector[0] * self.gradient * gradient.reshape((1, 1, 1, -1)),
+                weight_vector[1] * self.extrapolation * difference.reshape((1, 1, 1, -1)),
+                weight_vector[2] * gradient.reshape((1, 1, 1, -1)),
+                weight_vector[3] * difference.reshape((1, 1, 1, -1)),
                 algorithm.current_state[0].reshape((1, 1, 1, -1)),
                 algorithm.current_state[1].reshape((1, 1, 1, -1)),
                 ), dim=1)).flatten()
 
-        return algorithm.current_state[-1] + update
+        return algorithm.current_state[-1] + update_step
 
     @staticmethod
     def update_state(opt_algo: OptimizationAlgorithm) -> None:
