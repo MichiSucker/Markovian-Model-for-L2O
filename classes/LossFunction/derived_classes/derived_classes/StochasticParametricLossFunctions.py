@@ -20,9 +20,9 @@ class StochasticParametricLossFunction(ParametricLossFunction):
         idx = torch.randperm(self.N)[:batch_size]
 
         # Select corresponding datapoints
-        cur_xes, cur_yes = self.parameter['xes'][idx], self.parameter['yes'][idx]
+        cur_xes, cur_yes = self.parameter['x_values'][idx], self.parameter['y_values'][idx]
         cur_parameter = self.parameter.copy()
-        cur_parameter['xes'], cur_parameter['yes'] = cur_xes, cur_yes
+        cur_parameter['x_values'], cur_parameter['y_values'] = cur_xes, cur_yes
 
         # Setup function and compute grad (as usual)
         current_f = ParametricLossFunction(function=self.function, parameter=cur_parameter)
