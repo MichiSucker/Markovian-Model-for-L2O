@@ -77,6 +77,7 @@ def create_parameter(x_values: torch.Tensor,
                      coefficients: torch.Tensor) -> dict:
     return {'x_values': x_values,
             'y_values': y_values,
+            'dataset': torch.hstack((x_values, y_values)),
             'ground_truth_values': ground_truth_values,
             'coefficients': coefficients,
             'optimal_loss': torch.tensor(0.0)}
