@@ -14,7 +14,7 @@ class StochasticParametricLossFunction(ParametricLossFunction):
                                for d in parameter['dataset']]
         super().__init__(function=function, parameter=parameter)
 
-    def stochastic_grad(self, x, batch_size=1, return_loss=False, *args, **kwargs):
+    def compute_stochastic_gradient(self, x, batch_size=1, return_loss=False, *args, **kwargs):
 
         # Get first batch_size elements of random permutation of numbers 0 to N-1
         idx = torch.randperm(self.N)[:batch_size]
