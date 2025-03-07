@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 
 
-class SGD(nn.Module):
+class StochasticGradientDescent(nn.Module):
 
     def __init__(self, step_size: torch.tensor, batch_size: int):
-        super(SGD, self).__init__()
+        super(StochasticGradientDescent, self).__init__()
         self.step_size = nn.Parameter(step_size)
         self.batch_size = batch_size
 
