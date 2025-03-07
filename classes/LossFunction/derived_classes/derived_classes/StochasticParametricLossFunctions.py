@@ -13,9 +13,7 @@ class StochasticParametricLossFunction(ParametricLossFunction):
         self.data = parameter['dataset']
         self.empirical_risk = [ParametricLossFunction(function=single_function, parameter=d)
                                for d in parameter['dataset']]
-        print(f"Before super().__init__ - self.func: {self.whole_function}")
         super().__init__(function=function, parameter=parameter)
-        print(f"After super().__init__ - self.func: {self.whole_function}")
 
     def compute_stochastic_gradient(self, x, batch_size=1, return_loss=False, *args, **kwargs):
 
