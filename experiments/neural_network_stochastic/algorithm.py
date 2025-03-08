@@ -39,9 +39,8 @@ class StochasticNnOptimizer(nn.Module):
     def forward(self, optimization_algorithm):
 
         # Compute gradient and normalize
-        grad, loss = optimization_algorithm.loss_function.stochastic_grad(optimization_algorithm.current_state[-1],
-                                                                          batch_size=self.batch_size,
-                                                                          return_loss=True)
+        grad, loss = optimization_algorithm.loss_function.compute_stochastic_gradient(
+            optimization_algorithm.current_state[-1], batch_size=self.batch_size, return_loss=True)
         t = optimization_algorithm.iteration_counter
 
         # Update momentum
