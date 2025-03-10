@@ -117,7 +117,8 @@ def compute_losses_over_iterations_for_adam(neural_network: NeuralNetworkForStan
                                             parameter: dict) -> List[float]:
     neural_network_for_standard_training, losses_over_iterations_of_adam, _ = train_model(
         net=neural_network, data=parameter, criterion=evaluation_assistant.loss_of_neural_network,
-        n_it=evaluation_assistant.number_of_iterations_for_testing, lr=evaluation_assistant.lr_adam
+        n_it=evaluation_assistant.number_of_iterations_for_testing, lr=evaluation_assistant.lr_adam,
+        batch_size=get_batch_size()
     )
     return losses_over_iterations_of_adam
 

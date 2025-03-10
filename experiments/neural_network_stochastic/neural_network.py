@@ -50,6 +50,7 @@ class NeuralNetworkForStandardTraining(nn.Module):
 def train_model(net: NeuralNetworkForStandardTraining,
                 data: dict,
                 criterion: Callable,
+                batch_size: int,
                 n_it: int,
                 lr: float) -> Tuple[nn.Module, list, list]:
 
@@ -57,9 +58,11 @@ def train_model(net: NeuralNetworkForStandardTraining,
     iterates, losses = [], []
 
     for i in range(n_it + 1):
+
+        idx = torch.randint(low=0, high=len(data['xes']), size=(batch_size,))  # Sample random functions
         iterates.append(net.transform_parameters_to_tensor())
         optimizer.zero_grad()
-        loss = criterion(net(data['x_values']), data['y_values'])
+        loss = criterion(net(data['xes'][idx]), data['yes'][idx])
         losses.append(loss.item())
         loss.backward()
         optimizer.step()
