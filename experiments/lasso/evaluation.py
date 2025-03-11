@@ -24,8 +24,7 @@ class EvaluationAssistant:
                  nonsmooth_part: Callable,
                  initial_state_learned_algorithm: torch.Tensor,
                  number_of_iterations_during_training: int,
-                 optimal_hyperparameters: dict,
-                 implementation_class: Callable):
+                 optimal_hyperparameters: dict):
         self.test_set = test_set
         self.initial_state_learned_algorithm = initial_state_learned_algorithm
         self.number_of_iterations_during_training = number_of_iterations_during_training
@@ -34,10 +33,8 @@ class EvaluationAssistant:
         self.smooth_part = smooth_part
         self.nonsmooth_part = nonsmooth_part
         self.optimal_hyperparameters = optimal_hyperparameters
-        self.implementation_class = implementation_class
         self.dim = initial_state_learned_algorithm.shape[1]
         self.number_of_iterations_for_approximation = 5000
-        self.implementation_arguments = None
         self.smoothness_parameter = None
         self.initial_state_baseline_algorithm = None
 
@@ -111,9 +108,7 @@ def set_up_evaluation_assistant(loading_path: str) -> EvaluationAssistant:
         test_set=parameters['test'], loss_of_algorithm=loss_of_algorithm,
         smooth_part=smooth_part, nonsmooth_part=nonsmooth_part,
         initial_state_learned_algorithm=initial_state_learned_algorithm, number_of_iterations_during_training=n_train,
-        optimal_hyperparameters=best_sample, implementation_class=SparsityNet)
-    evaluation_assistant.implementation_arguments = {'dim': initial_state_learned_algorithm.shape[1],
-                                                     'smoothness': smoothness_parameter}
+        optimal_hyperparameters=best_sample)
     evaluation_assistant.smoothness_parameter = smoothness_parameter
     evaluation_assistant.initial_state_baseline_algorithm = initialization_baseline_algorithm
     return evaluation_assistant
