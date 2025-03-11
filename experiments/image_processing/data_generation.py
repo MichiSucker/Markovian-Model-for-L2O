@@ -255,10 +255,6 @@ def extend_precomputed_images(path_to_images: str, number_of_new_images: dict, d
             print("Loading smoothness parameter.")
             smoothness_parameter = pickle.load(f)
 
-        # for dataset in parameters.keys():
-        #     for p in parameters[dataset]:
-        #         p['optimal_loss'] = p['opt_val']
-
         loss_function_of_algorithm, quadratic, regularizer, blur_tensor = get_loss_function_of_algorithm()
         images = load_images(path_to_images, device=device)
         new_parameters = get_parameters(
