@@ -59,7 +59,6 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
     return {'restart_probability': restart_probability,
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
-            # TODO: Change to correct number
             'n_max': int(500e3),
             'lr': 1e-4,
             'num_iter_update_stepsize': int(75e3),
