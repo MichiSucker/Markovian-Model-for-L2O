@@ -57,7 +57,6 @@ def get_finite_difference_kernels() -> Tuple[torch.Tensor, torch.Tensor]:
 
 
 def get_shape_of_images() -> Tuple[int, int, int, int]:
-    # TODO: Adjust dimension accordingly
     img_height = 200
     img_width = int(0.75 * img_height)
     return 1, 1, img_height, img_width  # Note that this automatically returns a tuple
