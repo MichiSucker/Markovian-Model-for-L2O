@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from classes.StoppingCriterion.derived_classes.subclass_LossCriterion import LossCriterion
 from experiments.helper.for_plotting import set_size
 import matplotlib.gridspec as gridspec
-from experiments.neural_network_full_batch.training import get_stopping_criterion
+from experiments.neural_network_stochastic.training import get_stopping_criterion
 
 
 def create_evaluation_plot(loading_path, path_of_experiment):
@@ -42,8 +41,8 @@ def create_evaluation_plot(loading_path, path_of_experiment):
     stopping_criterion = get_stopping_criterion()
     # Note that we use np.max here, because the algorithm stops, as soon as one of the criteria is reached.
     # However, here it is just one anyway.
-    threshold = float(np.max([crit.threshold for crit in stopping_criterion.criteria
-                              if isinstance(crit, LossCriterion)]))
+    threshold = stopping_criterion.threshold
+    print(threshold)
     losses_std[losses_std <= threshold] = threshold
 
     # Create Figure
