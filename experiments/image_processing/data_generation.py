@@ -10,6 +10,10 @@ from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import Optimizati
 from algorithms.nesterov_accelerated_gradient_descent import NesterovAcceleratedGradient
 from tqdm import tqdm
 from PIL import Image
+import pickle
+import warnings
+from pathlib import Path
+import os
 from os import listdir
 from random import shuffle
 from scipy.sparse import linalg
@@ -54,7 +58,7 @@ def get_finite_difference_kernels() -> Tuple[torch.Tensor, torch.Tensor]:
 
 def get_shape_of_images() -> Tuple[int, int, int, int]:
     # TODO: Adjust dimension accordingly
-    img_height = 50
+    img_height = 200
     img_width = int(0.75 * img_height)
     return 1, 1, img_height, img_width  # Note that this automatically returns a tuple
 
@@ -77,8 +81,9 @@ def get_largest_possible_regularization_parameter() -> float:
     return dist.high.item()
 
 
-def get_loss_function_of_algorithm(blurring_kernel: torch.Tensor) -> Tuple[Callable, Callable, Callable, Callable]:
+def get_loss_function_of_algorithm() -> Tuple[Callable, Callable, Callable, Callable]:
 
+    blurring_kernel = get_blurring_kernel()
     shape_of_image = get_shape_of_images()
     epsilon = get_epsilon()
     diff_kernel_width, diff_kernel_height = get_finite_difference_kernels()
@@ -211,7 +216,7 @@ def get_parameters(images: List[torch.Tensor],
 
 def approximate_optimal_loss(parameters: dict, template_loss_function: Callable, smoothness_parameter: float):
 
-    stop_crit = GradientCriterion(threshold=1e-5)
+    stop_crit = GradientCriterion(threshold=1e-4)
     height, width = get_image_height_and_width()
     initialization = torch.vstack((torch.zeros(width * height),
                                    torch.zeros(width * height),
@@ -237,18 +242,99 @@ def approximate_optimal_loss(parameters: dict, template_loss_function: Callable,
     return parameters
 
 
+def extend_precomputed_images(path_to_images: str, number_of_new_images: dict, device: str = 'cpu'):
+    height, width = get_image_height_and_width()
+    print(f"\tHeight = {height}, Width = {width}")
+    path = path_to_images + '/height_' + str(height) + '_width_' + str(width)
+    if os.path.isdir(path):
+        with open(path + '/parameters', 'rb') as f:
+            print("Loading parameters.")
+            parameters = pickle.load(f)
+
+        with open(path + '/smoothness_parameter', 'rb') as f:
+            print("Loading smoothness parameter.")
+            smoothness_parameter = pickle.load(f)
+
+        # for dataset in parameters.keys():
+        #     for p in parameters[dataset]:
+        #         p['optimal_loss'] = p['opt_val']
+
+        loss_function_of_algorithm, quadratic, regularizer, blur_tensor = get_loss_function_of_algorithm()
+        images = load_images(path_to_images, device=device)
+        new_parameters = get_parameters(
+            images=images, number_of_datapoints_per_dataset=number_of_new_images,
+            blurring_function=blur_tensor)
+        new_parameters = approximate_optimal_loss(parameters=new_parameters,
+                                                  template_loss_function=loss_function_of_algorithm,
+                                                  smoothness_parameter=smoothness_parameter)
+
+        for dataset in parameters.keys():
+            parameters[dataset].extend(new_parameters[dataset])
+            print(f"New number of datapoints in {dataset} dataset: {len(parameters[dataset])}")
+
+        with open(path + '/parameters', 'wb') as f:
+            print("Saving parameters.")
+            pickle.dump(parameters, f)
+
+        with open(path + '/smoothness_parameter', 'wb') as f:
+            print("Saving smoothness parameter.")
+            pickle.dump(smoothness_parameter, f)
+
+
 def get_data(path_to_images: str,
              number_of_datapoints_per_dataset: dict,
-             device: str) -> Tuple[dict, Callable, Callable, Callable, float]:
+             device: str,
+             load_data: bool = False) -> Tuple[dict, Callable, Callable, Callable, float]:
 
-    blurring_kernel = get_blurring_kernel()
-    smoothness_parameter = get_smoothness_parameter()
-    loss_function_of_algorithm, quadratic, regularizer, blur_tensor = get_loss_function_of_algorithm(blurring_kernel)
-    images = load_images(path_to_images, device=device)
-    parameters = get_parameters(
-        images=images, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset, blurring_function=blur_tensor
-    )
-    parameters = approximate_optimal_loss(parameters=parameters, template_loss_function=loss_function_of_algorithm,
-                                          smoothness_parameter=smoothness_parameter)
+    loss_function_of_algorithm, quadratic, regularizer, blur_tensor = get_loss_function_of_algorithm()
+    if load_data:
+        print("Loading data.")
+        height, width = get_image_height_and_width()
+        path = path_to_images + '/height_' + str(height) + '_width_' + str(width)
+        if os.path.isdir(path):
+
+            with open(path + '/parameters', 'rb') as f:
+                print("Loading parameters.")
+                parameters = pickle.load(f)
+
+            with open(path + '/smoothness_parameter', 'rb') as f:
+                print("Saving smoothness parameter.")
+                smoothness_parameter = pickle.load(f)
+        else:
+            raise Exception(f"Loading path for images of size {height}x{width} does not exist.")
+
+        for dataset in ['prior', 'train', 'test', 'validation']:
+            if len(parameters[dataset]) > number_of_datapoints_per_dataset[dataset]:
+                print("Subsampling from dataset")
+                parameters[dataset] = np.random.choice(parameters[dataset],
+                                                       size=number_of_datapoints_per_dataset[dataset])
+                print(f"Number of {dataset} images got reduced to {len(parameters[dataset])}.")
+
+            if len(parameters[dataset]) < number_of_datapoints_per_dataset[dataset]:
+                warnings.warn(f"Number of {dataset} images ({len(parameters[dataset])}) is too smaller than required.")
+
+    else:
+        print("Computing new data.")
+        smoothness_parameter = get_smoothness_parameter()
+        print(f"\tSmoothness parameter = {smoothness_parameter:.2f}")
+        height, width = get_image_height_and_width()
+        print(f"\tHeight = {height}, Width = {width}")
+        images = load_images(path_to_images, device=device)
+        parameters = get_parameters(
+            images=images, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset,
+            blurring_function=blur_tensor)
+        parameters = approximate_optimal_loss(parameters=parameters, template_loss_function=loss_function_of_algorithm,
+                                              smoothness_parameter=smoothness_parameter)
+
+        savings_path = path_to_images + '/height_' + str(height) + '_width_' + str(width)
+        Path(savings_path).mkdir(parents=True, exist_ok=True)
+
+        with open(savings_path + '/parameters', 'wb') as f:
+            print("Saving parameters.")
+            pickle.dump(parameters, f)
+
+        with open(savings_path + '/smoothness_parameter', 'wb') as f:
+            print("Saving smoothness parameter.")
+            pickle.dump(smoothness_parameter, f)
 
     return parameters, loss_function_of_algorithm, quadratic, regularizer, smoothness_parameter
