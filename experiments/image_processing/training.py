@@ -28,7 +28,6 @@ def create_folder_for_storing_data(path_of_experiment: str) -> str:
 
 
 def get_number_of_datapoints() -> dict:
-    # TODO: Change to correct numbers
     return {'prior': 500, 'train': 500, 'test': 250, 'validation': 250}
 
 
