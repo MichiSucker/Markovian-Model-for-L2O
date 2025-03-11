@@ -82,7 +82,6 @@ def get_pac_bayes_parameters() -> dict:
     return {'epsilon': torch.tensor(0.05),
             'upper_bound': 1.0,
             # TODO: Rename n_max to maximal_number_of_iterations
-            # TODO: Change to correct number of iterations
             'n_max': 3000}
 
 
