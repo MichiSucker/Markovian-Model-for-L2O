@@ -2,8 +2,6 @@ import unittest
 from typing import Callable
 import torch
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
-from classes.OptimizationAlgorithm.derived_classes.derived_classes.subclass_PacBayesOptimizationAlgorithm import \
-    PacBayesOptimizationAlgorithm
 from experiments.lasso.data_generation import get_dimensions
 from experiments.lasso.training import get_describing_property, get_baseline_algorithm
 from experiments.lasso.evaluation import (set_up_evaluation_assistant,
