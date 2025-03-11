@@ -84,7 +84,7 @@ def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
             'length_trajectory': length_trajectory,
             'with_restarting': True,
             'restart_probability': restart_probability,
-            'num_samples': 1,
+            'num_samples': 10,
             'num_iter_burnin': 0}
 
 
@@ -94,9 +94,9 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
     return {'restart_probability': restart_probability,
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
-            'n_max': int(200e3),
+            'n_max': int(500e3),
             'lr': 1e-4,
-            'num_iter_update_stepsize': int(20e3),
+            'num_iter_update_stepsize': int(40e3),
             'factor_stepsize_update': 0.5}
 
 
@@ -137,7 +137,7 @@ def get_constraint(parameters_of_estimation: dict, loss_functions_for_constraint
 
 
 def get_stopping_criterion():
-    return LossCriterion(threshold=0.75)
+    return LossCriterion(threshold=0.9)
 
 
 def get_batch_size():
