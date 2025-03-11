@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 from typing import Callable, Tuple, List
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
 
 
 def polynomial_features(x: torch.Tensor, degree: int) -> torch.Tensor:
@@ -59,15 +62,64 @@ def train_model(net: NeuralNetworkForStandardTraining,
 
     for i in range(n_it + 1):
 
-        idx = torch.randint(low=0, high=len(data['xes']), size=(batch_size,))  # Sample random functions
+        idx = torch.randint(low=0, high=len(data['x_values']), size=(batch_size,))  # Sample random functions
         iterates.append(net.transform_parameters_to_tensor())
         optimizer.zero_grad()
-        loss = criterion(net(data['xes'][idx]), data['yes'][idx])
+        loss = criterion(net(data['x_values'][idx]), data['y_values'][idx])
         losses.append(loss.item())
         loss.backward()
         optimizer.step()
 
     return net, losses, iterates
+
+
+def grid_search(net, parameters, batch_size, criterion, lr_min, lr_max, num_lr_to_test, num_steps, path):
+
+    num_runs_per_problem = 3
+
+    # Setup learning rates that should be tested
+    learning_rates_to_test = torch.linspace(start=lr_min, end=lr_max, steps=num_lr_to_test)
+
+    all_losses = np.empty((len(learning_rates_to_test), num_runs_per_problem * len(parameters)))
+    pbar = tqdm(enumerate(learning_rates_to_test))
+    pbar.set_description('Gridsearch Adam')
+    for i, lr in pbar:
+        print(lr)
+        losses_for_lr = []
+        pbar_2 = tqdm(parameters)
+        for p in pbar_2:
+            pbar_3 = tqdm(range(num_runs_per_problem))
+            for _ in pbar_3:
+
+                # Compute losses of adam
+                net, losses_adam, iterates_adam = train_model(net=net,
+                                                              data=p,
+                                                              batch_size=batch_size,
+                                                              criterion=criterion,
+                                                              n_it=num_steps,
+                                                              lr=lr)
+
+                losses_for_lr.append(losses_adam[-1])
+
+        all_losses[i, :] = losses_for_lr
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+
+    ax.plot(learning_rates_to_test, np.mean(all_losses, axis=1), linestyle='dashed', color='orange')
+    ax.plot(learning_rates_to_test, np.median(all_losses, axis=1), linestyle='dotted', color='orange')
+    ax.fill_between(learning_rates_to_test,
+                    np.quantile(all_losses, q=0.025, axis=1),
+                    np.quantile(all_losses, q=0.975, axis=1), alpha=0.3, color='orange')
+
+    ax.grid('on')
+    ax.set_title('Results Gridsearch')
+    ax.set_ylabel('$\ell(x^{(n)}_{\mathrm{Adam}})$')
+    ax.set_xlabel('$\\tau$')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+
+    plt.tight_layout()
+    fig.savefig(path + '/grid_search_adam.pdf', dpi=300, bbox_inches='tight')
 
 
 class NeuralNetworkForLearning(nn.Module):

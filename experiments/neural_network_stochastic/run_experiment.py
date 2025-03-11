@@ -13,7 +13,7 @@ def create_folder_for_experiment(path_to_experiment_folder: str) -> str:
 
 def run(path_to_experiment_folder: str) -> None:
 
-    print("Starting experiment on training a neural network.")
+    print("Starting experiment on stochastic empirical risk minimization for training a neural network.")
     # torch.manual_seed(47)  # This is for exact reproducibility.
 
     # torch.manual_seed(4)   # If you want to reproduce exactly.
@@ -30,7 +30,7 @@ def run(path_to_experiment_folder: str) -> None:
     set_up_and_train_algorithm(path_of_experiment=path_of_experiment)
     print("\tFinished training.")
     print("\tStarting evaluation.")
-    evaluate_algorithm(path_of_experiment=path_of_experiment, loading_path=path_of_experiment + 'data/')
+    evaluate_algorithm(path_of_experiment=path_of_experiment, loading_path=path_of_experiment + 'data/', rerun_grid_search=True)
     print("\tFinished evaluation.")
     print("\tCreating evaluation plot.")
     create_evaluation_plot(loading_path=path_of_experiment + 'data/', path_of_experiment=path_of_experiment)
