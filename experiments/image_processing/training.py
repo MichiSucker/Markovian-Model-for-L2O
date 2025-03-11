@@ -29,7 +29,7 @@ def create_folder_for_storing_data(path_of_experiment: str) -> str:
 
 def get_number_of_datapoints() -> dict:
     # TODO: Change to correct numbers
-    return {'prior': 100, 'train': 100, 'test': 100, 'validation': 100}
+    return {'prior': 500, 'train': 500, 'test': 250, 'validation': 250}
 
 
 def get_parameters_of_estimation() -> dict:
@@ -50,7 +50,7 @@ def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
             'with_restarting': True,
             'restart_probability': restart_probability,
             # TODO: Change to correct number
-            'num_samples': 1,
+            'num_samples': 10,
             'num_iter_burnin': 0}
 
 
@@ -61,9 +61,9 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
             # TODO: Change to correct number
-            'n_max': int(400e3),
+            'n_max': int(500e3),
             'lr': 1e-4,
-            'num_iter_update_stepsize': int(40e3),
+            'num_iter_update_stepsize': int(75e3),
             'factor_stepsize_update': 0.5}
 
 
