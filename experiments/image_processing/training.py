@@ -17,6 +17,8 @@ from experiments.image_processing.algorithm import ConvNet
 from experiments.image_processing.data_generation import get_image_height_and_width, get_data
 from exponential_family.describing_property.average_rate_property import get_rate_property
 from pathlib import Path
+from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 
 def create_folder_for_storing_data(path_of_experiment: str) -> str:
@@ -27,7 +29,7 @@ def create_folder_for_storing_data(path_of_experiment: str) -> str:
 
 def get_number_of_datapoints() -> dict:
     # TODO: Change to correct numbers
-    return {'prior': 5, 'train': 5, 'test': 5, 'validation': 5}
+    return {'prior': 100, 'train': 100, 'test': 100, 'validation': 100}
 
 
 def get_parameters_of_estimation() -> dict:
@@ -59,9 +61,9 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
             # TODO: Change to correct number
-            'n_max': int(50e3),
+            'n_max': int(400e3),
             'lr': 1e-4,
-            'num_iter_update_stepsize': int(20e3),
+            'num_iter_update_stepsize': int(40e3),
             'factor_stepsize_update': 0.5}
 
 
@@ -83,7 +85,7 @@ def get_pac_bayes_parameters() -> dict:
             'upper_bound': 1.0,
             # TODO: Rename n_max to maximal_number_of_iterations
             # TODO: Change to correct number of iterations
-            'n_max': 300}
+            'n_max': 3000}
 
 
 def get_describing_property() -> Tuple[Callable, Callable]:
@@ -107,12 +109,15 @@ def get_initial_states() -> Tuple[torch.Tensor, torch.Tensor]:
 
 def get_baseline_algorithm(loss_function_of_algorithm: Callable, smoothness_parameter: float):
     initial_state_baseline_algorithm, _ = get_initial_states()
-    baseline_algorith = OptimizationAlgorithm(
-        implementation=NesterovAcceleratedGradient(alpha=torch.tensor(1/smoothness_parameter)),
+    stopping_criterion = get_stopping_criterion()
+    step_size = torch.tensor(1 / smoothness_parameter)
+    baseline_algorithm = OptimizationAlgorithm(
+        implementation=NesterovAcceleratedGradient(alpha=step_size),
         initial_state=initial_state_baseline_algorithm,
-        loss_function=LossFunction(function=loss_function_of_algorithm)
+        loss_function=LossFunction(function=loss_function_of_algorithm),
+        stopping_criterion=stopping_criterion
     )
-    return baseline_algorith
+    return baseline_algorithm
 
 
 def get_constraint(loss_functions_for_constraint: List[LossFunction]) -> Constraint:
@@ -163,11 +168,44 @@ def create_parametric_loss_functions_from_parameters(template_loss_function: Cal
     return loss_functions
 
 
-def set_up_and_train_algorithm(path_of_experiment: str, path_to_images: str) -> None:
+def sanity_check(algorithm: OptimizationAlgorithm,
+                 loss_function: RegularizedParametricLossFunction,
+                 name: str,
+                 savings_path: str) -> None:
+
+    fig, ax = plt.subplots(1, 1, figsize=(8, 4))
+
+    iterations = torch.arange(1e3 + 1)
+
+    parameter = loss_function.parameter
+    optimal_loss = parameter['optimal_loss'].item()
+    algorithm.set_loss_function(loss_function)
+    losses = [algorithm.evaluate_loss_function_at_current_iterate().item() - optimal_loss]
+    pbar = tqdm(range(len(iterations) - 1))
+    pbar.set_description(f'Sanity check {name}')
+    for _ in pbar:
+        algorithm.perform_step()
+        losses.append(algorithm.evaluate_loss_function_at_current_iterate().item() - optimal_loss)
+
+    losses = np.array(losses)
+    print(f"Saved optimal loss = {optimal_loss:.2f}, "
+          f"Computed optimal loss = {algorithm.evaluate_loss_function_at_current_iterate().item():.2f}")
+    print(f"Final gradient norm = {algorithm.evaluate_gradient_norm_at_current_iterate().item():.6f}")
+    ax.plot(iterations.numpy(), losses)
+    ax.set_yscale('log')
+    ax.set_ylabel('loss')
+    ax.set_xlabel('iteration')
+    ax.grid('on')
+
+    fig.savefig(savings_path + name + 'sanity_check_.pdf', dpi=300, bbox_inches='tight')
+
+
+def set_up_and_train_algorithm(path_of_experiment: str, path_to_images: str, load_data: bool = False) -> None:
 
     number_of_datapoints_per_dataset = get_number_of_datapoints()
     parameters, loss_function_of_algorithm, data_fidelity_term, regularizer, smoothness_parameter = get_data(
-        path_to_images=path_to_images, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset, device='cpu')
+        path_to_images=path_to_images, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset,
+        device='cpu', load_data=load_data)
     loss_functions = create_parametric_loss_functions_from_parameters(
         template_loss_function=loss_function_of_algorithm, template_data_fidelity=data_fidelity_term,
         template_regularizer=regularizer, parameters=parameters)
@@ -197,7 +235,12 @@ def set_up_and_train_algorithm(path_of_experiment: str, path_to_images: str) -> 
     )
 
     savings_path = create_folder_for_storing_data(path_of_experiment)
-    save_data(savings_path=savings_path, smoothness_parameter=smoothness_parameter,
+    sanity_check(algorithm=algorithm_for_learning, loss_function=loss_functions['prior'][0], name='Prior',
+                 savings_path=savings_path)
+    sanity_check(algorithm=algorithm_for_learning, loss_function=loss_functions['train'][0], name='Train',
+                 savings_path=savings_path)
+    save_data(savings_path=savings_path,
+              smoothness_parameter=smoothness_parameter,
               pac_bound_rate=pac_bound_rate.numpy(),
               pac_bound_time=pac_bound_time.numpy(),
               pac_bound_conv_prob=pac_bound_conv_prob.numpy(),
@@ -205,8 +248,10 @@ def set_up_and_train_algorithm(path_of_experiment: str, path_to_images: str) -> 
               upper_bound_time=algorithm_for_learning.n_max,
               initialization_learned_algorithm=algorithm_for_learning.initial_state.clone().numpy(),
               initialization_baseline_algorithm=baseline_algorithm.initial_state.clone().numpy(),
-              number_of_iterations=algorithm_for_learning.n_max, parameters=parameters,
-              samples_prior=state_dict_samples_prior, best_sample=algorithm_for_learning.implementation.state_dict())
+              number_of_iterations=algorithm_for_learning.n_max,
+              parameters=parameters,
+              samples_prior=state_dict_samples_prior,
+              best_sample=algorithm_for_learning.implementation.state_dict())
 
 
 def save_data(savings_path: str,
