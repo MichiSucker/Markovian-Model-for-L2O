@@ -30,7 +30,7 @@ def run(path_to_experiment_folder: str) -> None:
     set_up_and_train_algorithm(path_of_experiment=path_of_experiment)
     print("\tFinished training.")
     print("\tStarting evaluation.")
-    evaluate_algorithm(path_of_experiment=path_of_experiment, loading_path=path_of_experiment + 'data/', rerun_grid_search=True)
+    evaluate_algorithm(path_of_experiment=path_of_experiment, loading_path=path_of_experiment + 'data/')
     print("\tFinished evaluation.")
     print("\tCreating evaluation plot.")
     create_evaluation_plot(loading_path=path_of_experiment + 'data/', path_of_experiment=path_of_experiment)
