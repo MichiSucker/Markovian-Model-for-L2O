@@ -3,6 +3,7 @@ from typing import List, Tuple, Callable
 from numpy.typing import NDArray
 import numpy as np
 import pickle
+from tqdm import tqdm
 
 from experiments.neural_network_stochastic.neural_network import train_model, NeuralNetworkForStandardTraining
 from experiments.neural_network_stochastic.training import instantiate_neural_networks, get_stopping_criterion, \
@@ -137,8 +138,9 @@ def compute_losses(evaluation_assistant: EvaluationAssistant,
     losses_of_learned_algorithm, stopping_times_learned_algorithm, rates_learned_algorithm = [], [], []
     number_of_times_constrained_satisfied = 0
     _, convergence_risk_constraint = get_describing_property()
-
-    for test_parameter in evaluation_assistant.test_set:
+    pbar = tqdm(evaluation_assistant.test_set)
+    pbar.set_description('Compute losses')
+    for test_parameter in pbar:
 
         loss_over_iterations, stopping_time = compute_losses_over_iterations_and_stopping_time(
             learned_algorithm=learned_algorithm, evaluation_assistant=evaluation_assistant, parameter=test_parameter)
@@ -191,7 +193,7 @@ def set_up_evaluation_assistant(loading_path: str) -> Tuple[EvaluationAssistant,
     evaluation_assistant.loss_of_neural_network = loss_of_neural_network
     evaluation_assistant.implementation_arguments = (
         {'dim': neural_network_for_standard_training.get_dimension_of_weights()})
-    evaluation_assistant.lr_adam = 0.008  # Originally, this was found by gridsearch.
+    evaluation_assistant.lr_adam = 4e-3  # Originally, this was found by gridsearch.
     return evaluation_assistant, neural_network_for_standard_training
 
 
