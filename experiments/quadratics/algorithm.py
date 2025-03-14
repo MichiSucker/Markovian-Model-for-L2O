@@ -10,36 +10,40 @@ class Quadratics(nn.Module):
 
         self.dim = dim
 
-        size = 10
+        in_size = 3
+        h_size = 10
         size_out = 1
-        self.update_layer = nn.Sequential(
-            nn.Conv2d(3, size, kernel_size=1, bias=False),
-            nn.Conv2d(size, size, kernel_size=1, bias=False),
+        self.compute_update_direction = nn.Sequential(
+            nn.Conv2d(in_size, h_size, kernel_size=1, bias=False),
+            nn.Conv2d(h_size, h_size, kernel_size=1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(size, size, kernel_size=1, bias=False),
+            nn.Conv2d(h_size, h_size, kernel_size=1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(size, size, kernel_size=1, bias=False),
+            nn.Conv2d(h_size, h_size, kernel_size=1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(size, size, kernel_size=1, bias=False),
+            nn.Conv2d(h_size, h_size, kernel_size=1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(size, size, kernel_size=1, bias=False),
-            nn.Conv2d(size, size_out, kernel_size=1, bias=False),
+            nn.Conv2d(h_size, h_size, kernel_size=1, bias=False),
+            nn.Conv2d(h_size, size_out, kernel_size=1, bias=False),
         )
 
+        in_size = 4
+        out_size = 1
         h_size = 8
-        self.coefficients = nn.Sequential(
-            nn.Linear(4, h_size, bias=False),
-            nn.ReLU(),
+        self.compute_step_size = nn.Sequential(
+            nn.Linear(in_size, h_size, bias=False),
             nn.Linear(h_size, h_size, bias=False),
             nn.ReLU(),
             nn.Linear(h_size, h_size, bias=False),
             nn.ReLU(),
             nn.Linear(h_size, h_size, bias=False),
-            nn.Linear(h_size, size_out, bias=False),
+            nn.ReLU(),
+            nn.Linear(h_size, h_size, bias=False),
+            nn.Linear(h_size, out_size, bias=False),
         )
 
         # For stability
-        self.eps = torch.tensor(1e-24).float()
+        self.eps = torch.tensor(1e-20).float()
 
     def forward(self, opt_algo: OptimizationAlgorithm) -> torch.Tensor:
 
@@ -55,21 +59,22 @@ class Quadratics(nn.Module):
         if momentum_norm > self.eps:
             momentum = momentum / momentum_norm
 
-        step_size = self.coefficients(
+        loss = opt_algo.loss_function(opt_algo.current_state[1]).detach()
+        old_loss = opt_algo.loss_function(opt_algo.current_state[0]).detach()
+        step_size = self.compute_step_size(
             torch.concat(
                 (torch.log(1 + gradient_norm.reshape((1,))),
                  torch.log(1 + momentum_norm.reshape((1,))),
-                 torch.log(1 + opt_algo.loss_function(opt_algo.current_state[1]).detach().reshape((1,))),
-                 torch.log(1 + opt_algo.loss_function(opt_algo.current_state[0]).detach().reshape((1,)))
+                 torch.log(1 + loss.reshape((1,))),
+                 torch.log(1 + old_loss.reshape((1,)))
                  ))
         )
-        direction = self.update_layer(torch.concat((
+        direction = self.compute_update_direction(torch.concat((
             gradient.reshape((1, 1, 1, -1)),
             momentum.reshape((1, 1, 1, -1)),
             (gradient * momentum).reshape((1, 1, 1, -1)),
         ), dim=1)).reshape((self.dim, -1))
 
-        # old update: torch.matmul(direction, step_size).flatten()
         return opt_algo.current_state[-1] - step_size * direction.flatten()
 
     @staticmethod
