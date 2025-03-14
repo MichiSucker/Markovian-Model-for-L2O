@@ -19,7 +19,7 @@ import pickle
 
 
 def get_number_of_datapoints() -> dict:
-    return {'prior': 250, 'train': 250, 'test': 250, 'validation': 250}
+    return {'prior': 500, 'train': 1000, 'test': 250, 'validation': 250}
 
 
 def create_folder_for_storing_data(path_of_experiment: str) -> str:
@@ -60,7 +60,7 @@ def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
             'length_trajectory': length_trajectory,
             'with_restarting': True,
             'restart_probability': restart_probability,
-            'num_samples': 1,
+            'num_samples': 10,
             'num_iter_burnin': 0}
 
 
@@ -70,9 +70,9 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
     return {'restart_probability': restart_probability,
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
-            'n_max': int(300e3),
+            'n_max': int(400e3),
             'lr': 1e-4,
-            'num_iter_update_stepsize': int(30e3),
+            'num_iter_update_stepsize': int(20e3),
             'factor_stepsize_update': 0.5}
 
 
@@ -99,7 +99,7 @@ def get_constraint_parameters(number_of_training_iterations: int) -> dict:
 def get_pac_bayes_parameters() -> dict:
     return {'epsilon': torch.tensor(0.05),
             # TODO: Rename n_max to maximal_number_of_iterations
-            'upper_bound': 0.99,
+            'upper_bound': 0.98,
             'n_max': 500}
 
 
@@ -113,7 +113,7 @@ def get_constraint(parameters_of_estimation: dict, loss_functions_for_constraint
 
 
 def get_stopping_criterion():
-    return LossCriterion(threshold=1e-8)
+    return LossCriterion(threshold=1e-12)
 
 
 def get_algorithm_for_learning(loss_functions: dict,
