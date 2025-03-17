@@ -3,7 +3,7 @@ from typing import List, Tuple, Callable
 from numpy.typing import NDArray
 import numpy as np
 import pickle
-
+from tqdm import tqdm
 from experiments.neural_network_full_batch.neural_network import train_model, NeuralNetworkForStandardTraining
 from experiments.neural_network_full_batch.training import instantiate_neural_networks, get_stopping_criterion
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
@@ -129,7 +129,9 @@ def compute_losses(evaluation_assistant: EvaluationAssistant,
     number_of_times_constrained_satisfied = 0
     _, convergence_risk_constraint = get_describing_property()
 
-    for test_parameter in evaluation_assistant.test_set:
+    pbar = tqdm(evaluation_assistant.test_set)
+    pbar.set_description("Compute losses")
+    for test_parameter in pbar:
 
         loss_over_iterations, stopping_time = compute_losses_over_iterations_and_stopping_time(
             learned_algorithm=learned_algorithm, evaluation_assistant=evaluation_assistant, parameter=test_parameter)
