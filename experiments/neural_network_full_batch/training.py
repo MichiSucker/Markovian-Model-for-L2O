@@ -2,9 +2,7 @@ import torch
 from typing import List, Callable, Tuple
 from pathlib import Path
 from classes.LossFunction.class_LossFunction import LossFunction
-from classes.StoppingCriterion.class_CombinedCriterion import CombinedCriterion
 from classes.StoppingCriterion.derived_classes.subclass_LossCriterion import LossCriterion
-from classes.StoppingCriterion.derived_classes.subclass_GradientCriterion import GradientCriterion
 from classes.OptimizationAlgorithm.class_OptimizationAlgorithm import OptimizationAlgorithm
 from algorithms.gradient_descent import GradientDescent
 from experiments.neural_network_full_batch.data_generation import get_data, get_powers_of_polynomials
@@ -24,7 +22,7 @@ import pickle
 
 
 def get_number_of_datapoints() -> dict:
-    return {'prior': 250, 'train': 250, 'test': 250, 'validation': 250}
+    return {'prior': 250, 'train': 500, 'test': 250, 'validation': 250}
 
 
 def create_folder_for_storing_data(path_of_experiment: str) -> str:
@@ -67,7 +65,7 @@ def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
             'length_trajectory': length_trajectory,
             'with_restarting': True,
             'restart_probability': restart_probability,
-            'num_samples': 1,
+            'num_samples': 10,
             'num_iter_burnin': 0}
 
 
@@ -77,7 +75,7 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
     return {'restart_probability': restart_probability,
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
-            'n_max': int(200e3),
+            'n_max': int(400e3),
             'lr': 1e-4,
             'num_iter_update_stepsize': int(20e3),
             'factor_stepsize_update': 0.5}
@@ -107,7 +105,7 @@ def get_pac_bayes_parameters() -> dict:
     return {'epsilon': torch.tensor(0.05),
             'upper_bound': 1.0,
             # TODO: Rename n_max to maximal_number_of_iterations
-            'n_max': 100}
+            'n_max': 200}
 
 
 def get_constraint(parameters_of_estimation: dict, loss_functions_for_constraint: List[LossFunction]) -> Constraint:
@@ -120,7 +118,7 @@ def get_constraint(parameters_of_estimation: dict, loss_functions_for_constraint
 
 
 def get_stopping_criterion():
-    return CombinedCriterion([LossCriterion(threshold=0.75), GradientCriterion(threshold=0.75)])
+    return LossCriterion(threshold=0.85)
 
 
 def get_algorithm_for_learning(loss_functions: dict,
