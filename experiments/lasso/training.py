@@ -29,7 +29,7 @@ def create_folder_for_storing_data(path_of_experiment: str) -> str:
 
 
 def get_number_of_datapoints() -> dict:
-    return {'prior': 250, 'train': 250, 'test': 250, 'validation': 250}
+    return {'prior': 250, 'train': 500, 'test': 250, 'validation': 250}
 
 
 def get_parameters_of_estimation() -> dict:
@@ -39,7 +39,7 @@ def get_parameters_of_estimation() -> dict:
 def get_update_parameters() -> dict:
     return {'num_iter_print_update': 1000,
             'with_print': True,
-            'bins': [1e5, 5e4, 1e4, 5e3, 1e3, 5e2, 1e2, 5e1, 1e1][::-1]}
+            'bins': [5e5, 1e5, 5e4, 1e4, 5e3, 4e3, 3e3, 2e3, 1e3, 5e2][::-1]}
 
 
 def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
@@ -50,7 +50,7 @@ def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
             'with_restarting': True,
             'restart_probability': restart_probability,
             # TODO: Change back to 100
-            'num_samples': 1,
+            'num_samples': 10,
             'num_iter_burnin': 0}
 
 
@@ -60,14 +60,14 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
     return {'restart_probability': restart_probability,
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
-            'n_max': int(200e3),
+            'n_max': int(400e3),
             'lr': 1e-4,
             'num_iter_update_stepsize': int(20e3),
             'factor_stepsize_update': 0.5}
 
 
 def get_initialization_parameters() -> dict:
-    return {'lr': 1e-3, 'num_iter_max': 1000, 'num_iter_print_update': 200, 'num_iter_update_stepsize': 200,
+    return {'lr': 1e-3, 'num_iter_max': 20, 'num_iter_print_update': 200, 'num_iter_update_stepsize': 500,
             'with_print': True}
 
 
@@ -90,7 +90,7 @@ def get_pac_bayes_parameters() -> dict:
     return {'epsilon': torch.tensor(0.05),
             # TODO: Rename n_max to maximal_number_of_iterations
             'upper_bound': 1.0,
-            'n_max': 500}
+            'n_max': 600}
 
 
 def get_constraint(parameters_of_estimation: dict, loss_functions_for_constraint: list) -> Constraint:
@@ -180,11 +180,13 @@ def get_baseline_algorithm(smoothness_parameter: torch.Tensor,
 
 
 def set_up_and_train_algorithm(path_of_experiment: str) -> None:
-    # This is pretty important again. Also, it makes sure that all tensor types do match.
-    torch.set_default_dtype(torch.float64)
+
+    # Also, it makes sure that all tensor types do match.
+    torch.set_default_dtype(torch.float64)  # This is pretty important again.
+
     number_of_datapoints_per_dataset = get_number_of_datapoints()
     parameters, loss_function_of_algorithm, smooth_part, nonsmooth_part, smoothness_parameter = get_data(
-        number_of_datapoints_per_dataset)
+        number_of_datapoints_per_dataset, load_data=False, loading_path=path_of_experiment + 'data/')
     loss_functions = create_parametric_loss_functions_from_parameters(
         template_loss_function=loss_function_of_algorithm, smooth_part=smooth_part, nonsmooth_part=nonsmooth_part,
         parameters=parameters)
