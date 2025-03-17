@@ -23,7 +23,7 @@ import pickle
 
 
 def get_number_of_datapoints() -> dict:
-    return {'prior': 250, 'train': 250, 'test': 250, 'validation': 250}
+    return {'prior': 500, 'train': 1000, 'test': 250, 'validation': 250}
 
 
 def create_folder_for_storing_data(path_of_experiment: str) -> str:
