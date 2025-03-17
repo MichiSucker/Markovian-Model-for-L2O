@@ -1,6 +1,10 @@
 import torch
 from typing import Tuple, Callable
 from tqdm import tqdm
+import os
+import pickle
+import numpy as np
+import warnings
 from experiments.lasso.algorithm import soft_thresholding
 from classes.StoppingCriterion.class_StoppingCriterion import StoppingCriterion
 from classes.LossFunction.derived_classes.derived_classes.subclass_NonsmoothParametricLossFunction import (
@@ -131,12 +135,39 @@ def approximate_optimal_value(parameters, smoothness_constant):
     return parameters
 
 
-def get_data(number_of_datapoints_per_dataset: dict) -> Tuple[dict, Callable, Callable, Callable, torch.Tensor]:
+def get_data(number_of_datapoints_per_dataset: dict,
+             load_data: bool = False,
+             loading_path: str = None) -> Tuple[dict, Callable, Callable, Callable, torch.Tensor]:
 
-    A = get_matrix_for_smooth_part()
-    smoothness_parameter = calculate_smoothness_parameter(matrix=A)
-    loss_function_of_algorithm, smooth_part, nonsmooth_part = get_loss_function_of_algorithm()
-    parameters = get_parameters(matrix=A, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset)
-    parameters = approximate_optimal_value(parameters, smoothness_constant=smoothness_parameter)
+    if load_data and loading_path is not None:
+        if os.path.isdir(loading_path):
+
+            with open(loading_path + 'parameters_problem', 'rb') as f:
+                print("Loading parameters.")
+                parameters = pickle.load(f)
+
+            print("Loading smoothness parameter.")
+            smoothness_parameter = torch.tensor(np.load(loading_path + 'smoothness_parameter.npy'))
+        else:
+            raise Exception(f"Loading path does not exist.")
+
+        loss_function_of_algorithm, smooth_part, nonsmooth_part = get_loss_function_of_algorithm()
+
+        for dataset in ['prior', 'train', 'test', 'validation']:
+            if len(parameters[dataset]) > number_of_datapoints_per_dataset[dataset]:
+                print("Subsampling from dataset")
+                parameters[dataset] = np.random.choice(parameters[dataset],
+                                                       size=number_of_datapoints_per_dataset[dataset])
+                print(f"Number of {dataset} images got reduced to {len(parameters[dataset])}.")
+
+            if len(parameters[dataset]) < number_of_datapoints_per_dataset[dataset]:
+                warnings.warn(f"Number of {dataset} images ({len(parameters[dataset])}) is smaller than required.")
+
+    else:
+        A = get_matrix_for_smooth_part()
+        smoothness_parameter = calculate_smoothness_parameter(matrix=A)
+        loss_function_of_algorithm, smooth_part, nonsmooth_part = get_loss_function_of_algorithm()
+        parameters = get_parameters(matrix=A, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset)
+        parameters = approximate_optimal_value(parameters, smoothness_constant=smoothness_parameter)
 
     return parameters, loss_function_of_algorithm, smooth_part, nonsmooth_part, smoothness_parameter
