@@ -41,12 +41,9 @@ def create_evaluation_plot(loading_path, path_of_experiment):
     upper_bound_times = np.load(loading_path + 'upper_bound_time.npy')
 
     # Post-processing: If we had used a stopping criterion for Adam as well, ich would have stopped at a
-    # loss <= 0.75
+    # loss <= 0.85
     stopping_criterion = get_stopping_criterion()
-    # Note that we use np.max here, because the algorithm stops, as soon as one of the criteria is reached.
-    # However, here it is just one anyway.
-    threshold = float(np.max([crit.threshold for crit in stopping_criterion.criteria
-                              if isinstance(crit, LossCriterion)]))
+    threshold = float(stopping_criterion.threshold)
     losses_std[losses_std <= threshold] = threshold
 
     # Create Figure
