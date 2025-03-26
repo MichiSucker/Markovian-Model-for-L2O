@@ -48,7 +48,6 @@ def get_sampling_parameters(maximal_number_of_iterations: int) -> dict:
             'length_trajectory': length_trajectory,
             'with_restarting': True,
             'restart_probability': restart_probability,
-            # TODO: Change to correct number
             'num_samples': 10,
             'num_iter_burnin': 0}
 
@@ -59,9 +58,9 @@ def get_fitting_parameters(maximal_number_of_iterations: int) -> dict:
     return {'restart_probability': restart_probability,
             'length_trajectory': length_trajectory,
             # TODO: Rename n_max to number_of_training_iterations
-            'n_max': int(500e3),
+            'n_max': int(400e3),
             'lr': 1e-4,
-            'num_iter_update_stepsize': int(75e3),
+            'num_iter_update_stepsize': int(40e3),
             'factor_stepsize_update': 0.5}
 
 
@@ -80,9 +79,9 @@ def get_constraint_parameters(number_of_training_iterations: int) -> dict:
 
 def get_pac_bayes_parameters() -> dict:
     return {'epsilon': torch.tensor(0.05),
-            'upper_bound': 1.0,
+            'upper_bound': 1.,
             # TODO: Rename n_max to maximal_number_of_iterations
-            'n_max': 3000}
+            'n_max': 1000}
 
 
 def get_describing_property() -> Tuple[Callable, Callable]:
