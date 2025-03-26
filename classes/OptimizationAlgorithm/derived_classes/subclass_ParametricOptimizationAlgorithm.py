@@ -226,10 +226,12 @@ class ParametricOptimizationAlgorithm(OptimizationAlgorithm):
                                 did_converge: List[bool]) -> List[torch.Tensor]:
         # It is assumed that the loss-function can only be zero, if the algorithm did converge,
         # that is, loss_function[k-1] > 0.
-        ratios = [self.loss_function(predicted_iterates[k]) / self.loss_function(predicted_iterates[k - 1])
-                  if not did_converge[k]
-                  else self.loss_function(predicted_iterates[k]) - self.loss_function(predicted_iterates[k])
-                  for k in range(1, len(predicted_iterates))]
+        opt_val = self.loss_function.parameter['optimal_loss']
+        ratios = [(cur_loss - opt_val) / (prev_loss - opt_val)
+                  if ((cur_loss := self.loss_function(predicted_iterates[k])) > opt_val
+                      and (prev_loss := self.loss_function(predicted_iterates[k - 1])) > opt_val
+                      and not did_converge[k])
+                  else cur_loss - cur_loss for k in range(1, len(predicted_iterates))]
         return ratios
 
     def fit_with_function_values(self,
