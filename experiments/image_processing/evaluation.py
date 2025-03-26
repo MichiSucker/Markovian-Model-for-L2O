@@ -171,6 +171,9 @@ def compute_losses_rates_and_convergence_time(evaluation_assistant: EvaluationAs
                                 loss_at_end=loss_over_iterations[convergence_time],
                                 stopping_time=convergence_time)
             rates_of_baseline_algorithm.append(rate)
+        else:
+            print(loss_over_iterations)
+            print(convergence_time, "\n")
 
     return (np.array(losses_of_baseline_algorithm),
             np.array(rates_of_baseline_algorithm),
@@ -202,8 +205,11 @@ def compute_losses_over_iterations_and_stopping_time(algorithm: OptimizationAlgo
             break
 
         algorithm.perform_step()
-        loss_over_iterations.append(algorithm.evaluate_loss_function_at_current_iterate().item() - current_optimal_loss)
-
+        cur_loss = algorithm.evaluate_loss_function_at_current_iterate().item()
+        if cur_loss > current_optimal_loss:     # This has to be checked, since the optimal loss is approximated, too.
+            loss_over_iterations.append(cur_loss - current_optimal_loss)
+        else:
+            loss_over_iterations.append(torch.tensor(0.0))
     return loss_over_iterations, stopping_time
 
 
