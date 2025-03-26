@@ -215,7 +215,7 @@ def get_parameters(images: List[torch.Tensor],
 
 def approximate_optimal_loss(parameters: dict, template_loss_function: Callable, smoothness_parameter: float):
 
-    stop_crit = GradientCriterion(threshold=1e-4)
+    stop_crit = GradientCriterion(threshold=1e-6)
     height, width = get_image_height_and_width()
     initialization = torch.vstack((torch.zeros(width * height),
                                    torch.zeros(width * height),
@@ -309,20 +309,20 @@ def get_data(path_to_images: str,
                 warnings.warn(f"Number of {dataset} images ({len(parameters[dataset])}) is too smaller than required.")
 
     else:
+        height, width = get_image_height_and_width()
+        print(f"\tHeight = {height}, Width = {width}")
+        savings_path = path_to_images + '/height_' + str(height) + '_width_' + str(width)
+        Path(savings_path).mkdir(parents=True, exist_ok=True)
+
         print("Computing new data.")
         smoothness_parameter = get_smoothness_parameter()
         print(f"\tSmoothness parameter = {smoothness_parameter:.2f}")
-        height, width = get_image_height_and_width()
-        print(f"\tHeight = {height}, Width = {width}")
         images = load_images(path_to_images, device=device)
         parameters = get_parameters(
             images=images, number_of_datapoints_per_dataset=number_of_datapoints_per_dataset,
             blurring_function=blur_tensor)
         parameters = approximate_optimal_loss(parameters=parameters, template_loss_function=loss_function_of_algorithm,
                                               smoothness_parameter=smoothness_parameter)
-
-        savings_path = path_to_images + '/height_' + str(height) + '_width_' + str(width)
-        Path(savings_path).mkdir(parents=True, exist_ok=True)
 
         with open(savings_path + '/parameters', 'wb') as f:
             print("Saving parameters.")
