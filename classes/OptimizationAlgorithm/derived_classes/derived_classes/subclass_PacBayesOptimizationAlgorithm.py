@@ -188,7 +188,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
             # as later on, we take the mean, which takes the NUMBER OF LOSSES into account,
             # i.e. the final output would be too large, if one does not include 0.
             if not constraint_func(self):
-                rates.append(torch.tensor(0.0))  # Take zero, because it involves the indicator function.
+                rates.append(torch.tensor([0.0]))  # Take zero, because it involves the indicator function.
                 probabilities.append(torch.tensor(0.))
                 # If the algorithm does not converge, it gets stopped after n_max iterations.
                 stopping_times.append(torch.tensor(self.n_max).float())
@@ -316,7 +316,7 @@ class PacBayesOptimizationAlgorithm(ParametricOptimizationAlgorithm):
          prior_rates_independent,
          prior_conv_probs_independent,
          prior_stopping_times_independent) = self.get_preliminary_posterior_distribution(
-            loss_functions=loss_functions_prior[:n_half], constraints=constraint_functions_prior[:n_half],
+            loss_functions=loss_functions_prior[n_half:], constraints=constraint_functions_prior[n_half:],
             prior_rates=prior_rates_dependent, state_dict_samples=state_dict_samples_prior)
 
         # Get an estimate for all three lambdas by using this preliminary prior and posterior
